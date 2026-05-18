@@ -105,9 +105,9 @@ class ControlPuerta:
                 if not conn:
                     return
                 try:
-                    conn.write(CMD_ABRIR)
+                    conn.send_feature_report(CMD_ABRIR)
                     time.sleep(t)
-                    conn.write(CMD_CERRAR)
+                    conn.send_feature_report(CMD_CERRAR)
                 except Exception as e:
                     print(f"[PUERTA] Error en ciclo: {e}")
                 finally:
