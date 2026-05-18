@@ -1,7 +1,6 @@
 """
-core/puerta.py — Control del relé USB-Serial para la puerta magnética.
-La configuración (puerto COM, comando) se guarda en config_puerta.json
-junto al ejecutable, para que persista entre reinicios.
+core/puerta.py — Control del relé USB HID para la puerta magnética.
+La configuración se guarda en config_puerta.json junto al ejecutable.
 """
 
 import threading
@@ -10,31 +9,24 @@ import json
 import os
 
 try:
-    import serial
-    import serial.tools.list_ports
-    SERIAL_AVAILABLE = True
+    import hid
+    HID_AVAILABLE = True
 except ImportError:
-    SERIAL_AVAILABLE = False
+    HID_AVAILABLE = False
 
-# ─── CONFIG ────────────────────────────────────────────────────────────────────
 BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(BASE_DIR, "config_puerta.json")
 
-TIEMPO_APERTURA = 3  # segundos
+TIEMPO_APERTURA = 3
 
-# Comandos más comunes (índice guardado en config)
-COMANDOS_DISPONIBLES = [
-    ("Genérico A  [A0 01 01 A2]",  bytes([0xA0, 0x01, 0x01, 0xA2]), bytes([0xA0, 0x01, 0x00, 0xA1])),
-    ("Genérico B  [FF 01 01]",     bytes([0xFF, 0x01, 0x01]),        bytes([0xFF, 0x01, 0x00])),
-    ("Simple byte [01 / 00]",      bytes([0x01]),                    bytes([0x00])),
-]
+# Comandos HID relay estándar (9 bytes: report_id + cmd + relay_num + padding)
+CMD_ABRIR  = bytes([0x00, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
+CMD_CERRAR = bytes([0x00, 0xFD, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
 CONFIG_DEFAULT = {
-    "puerto":          "COM3",
-    "baudrate":        9600,
-    "comando_idx":     0,
+    "device_path":    "",
     "tiempo_apertura": TIEMPO_APERTURA,
-    "simulacion":      False,
+    "simulacion":     False,
 }
 
 
@@ -43,7 +35,6 @@ def cargar_config():
         try:
             with open(CONFIG_PATH, "r") as f:
                 cfg = json.load(f)
-            # Rellenar claves faltantes con defaults
             for k, v in CONFIG_DEFAULT.items():
                 cfg.setdefault(k, v)
             return cfg
@@ -62,12 +53,12 @@ def guardar_config(cfg):
         return False
 
 
-def listar_puertos():
-    """Devuelve lista de strings de puertos COM disponibles."""
-    if not SERIAL_AVAILABLE:
+def listar_dispositivos_hid():
+    """Devuelve lista de dicts con todos los dispositivos HID conectados."""
+    if not HID_AVAILABLE:
         return []
     try:
-        return [p.device for p in serial.tools.list_ports.comports()]
+        return hid.enumerate()
     except Exception:
         return []
 
@@ -75,26 +66,26 @@ def listar_puertos():
 # ══════════════════════════════════════════════════════════════════════════════
 class ControlPuerta:
     def __init__(self):
-        self.cfg  = cargar_config()
+        self.cfg   = cargar_config()
         self._lock = threading.Lock()
 
-    def _cmd_abrir(self):
-        idx = self.cfg.get("comando_idx", 0)
-        return COMANDOS_DISPONIBLES[idx][1]
-
-    def _cmd_cerrar(self):
-        idx = self.cfg.get("comando_idx", 0)
-        return COMANDOS_DISPONIBLES[idx][2]
+    def _path_bytes(self):
+        p = self.cfg.get("device_path", "")
+        if isinstance(p, bytes):
+            return p
+        return p.encode("utf-8") if p else b""
 
     def _conectar(self):
-        if not SERIAL_AVAILABLE or self.cfg.get("simulacion"):
+        if not HID_AVAILABLE or self.cfg.get("simulacion"):
+            return None
+        path = self._path_bytes()
+        if not path:
+            print("[PUERTA] No hay dispositivo configurado.")
             return None
         try:
-            return serial.Serial(
-                self.cfg["puerto"],
-                self.cfg.get("baudrate", 9600),
-                timeout=1
-            )
+            d = hid.device()
+            d.open_path(path)
+            return d
         except Exception as e:
             print(f"[PUERTA] Error de conexión: {e}")
             return None
@@ -105,7 +96,7 @@ class ControlPuerta:
 
         def _ciclo():
             with self._lock:
-                if self.cfg.get("simulacion") or not SERIAL_AVAILABLE:
+                if self.cfg.get("simulacion") or not HID_AVAILABLE:
                     print(f"[PUERTA SIMULADA] Abierta {t}s")
                     time.sleep(t)
                     print("[PUERTA SIMULADA] Cerrada")
@@ -114,9 +105,9 @@ class ControlPuerta:
                 if not conn:
                     return
                 try:
-                    conn.write(self._cmd_abrir())
+                    conn.write(CMD_ABRIR)
                     time.sleep(t)
-                    conn.write(self._cmd_cerrar())
+                    conn.write(CMD_CERRAR)
                 except Exception as e:
                     print(f"[PUERTA] Error en ciclo: {e}")
                 finally:
@@ -125,20 +116,17 @@ class ControlPuerta:
         threading.Thread(target=_ciclo, daemon=True).start()
 
     def test_conexion(self):
-        """
-        Intenta abrir y cerrar el puerto.
-        Retorna (ok: bool, mensaje: str)
-        """
-        if self.cfg.get("simulacion") or not SERIAL_AVAILABLE:
+        """Retorna (ok: bool, mensaje: str)."""
+        if self.cfg.get("simulacion") or not HID_AVAILABLE:
             return True, "Modo simulación activo — sin hardware real."
+        path = self._path_bytes()
+        if not path:
+            return False, "❌ No hay dispositivo configurado. Usá Detectar y guardá."
         try:
-            conn = serial.Serial(
-                self.cfg["puerto"],
-                self.cfg.get("baudrate", 9600),
-                timeout=1
-            )
-            conn.close()
-            return True, f"✅ Puerto {self.cfg['puerto']} detectado correctamente."
+            d = hid.device()
+            d.open_path(path)
+            d.close()
+            return True, "✅ Dispositivo HID detectado correctamente."
         except Exception as e:
             return False, f"❌ {e}"
 
