@@ -1,4 +1,4 @@
 python-dateutil
-hid
+hidapi
 screeninfo
 Pillow
