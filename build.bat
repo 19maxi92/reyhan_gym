@@ -16,7 +16,7 @@ echo  Sistema de Gestión — Build Script
 echo.
 
 echo [1/3] Instalando dependencias...
-pip install pyinstaller python-dateutil pyserial screeninfo pillow --quiet
+pip install pyinstaller python-dateutil hid screeninfo pillow --quiet
 if %errorlevel% neq 0 (
     echo ERROR: Fallo la instalacion de dependencias.
     pause
@@ -34,7 +34,8 @@ pyinstaller ^
     --add-data "core;core" ^
     --add-data "icon;icon" ^
     --hidden-import "screeninfo" ^
-    --hidden-import "serial" ^
+    --hidden-import "hid" ^
+    --collect-all "hid" ^
     --hidden-import "dateutil" ^
     main.py
 

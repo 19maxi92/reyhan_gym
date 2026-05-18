@@ -11,7 +11,7 @@ from datetime import date
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import db.database as db
-from core.puerta import puerta, COMANDOS_DISPONIBLES, listar_puertos, guardar_config
+from core.puerta import puerta, listar_dispositivos_hid, guardar_config
 
 # ─── TEMAS ─────────────────────────────────────────────────────────────────────
 TEMAS = {
@@ -677,6 +677,7 @@ class PanelAdmin(tk.Frame):
         self._titulo("🚪 Configuración de Puerta")
 
         cfg = puerta.cfg
+        self._hid_devices = []  # se llena al presionar Detectar
 
         # ── Estado actual ─────────────────────────────────────────────────────
         fc = tk.Frame(self.contenido, bg=T("CARD_BG"), padx=20, pady=16)
@@ -689,47 +690,24 @@ class PanelAdmin(tk.Frame):
         )
         self.lbl_estado_puerta.pack(anchor="w", pady=4)
 
-        # ── Config ────────────────────────────────────────────────────────────
-        tk.Label(self.contenido, text="Configuración del relé USB",
+        # ── Selección de dispositivo HID ──────────────────────────────────────
+        tk.Label(self.contenido, text="Dispositivo Relé USB HID",
                  font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(12, 4))
 
-        # Puerto COM
         f1 = tk.Frame(self.contenido, bg=T("BG"))
         f1.pack(fill="x", padx=24, pady=4)
-        tk.Label(f1, text="Puerto COM:", fg=T("TEXT"), bg=T("BG"),
-                 font=FONT_SMALL, width=20, anchor="w").pack(side="left")
-        puertos = listar_puertos()
-        self.var_puerto = tk.StringVar(value=cfg.get("puerto", "COM3"))
-        combo_puerto = ttk.Combobox(f1, textvariable=self.var_puerto,
-                                    values=puertos if puertos else ["COM1","COM2","COM3","COM4","COM5"],
-                                    width=12)
-        combo_puerto.pack(side="left")
-        boton(f1, "🔄 Actualizar lista",
-              lambda: combo_puerto.configure(values=listar_puertos()),
-              color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="left", padx=8)
+        boton(f1, "🔍 Detectar dispositivos", self._detectar_hid,
+              color="#3a7bd5", fg="white").pack(side="left", padx=(0, 8))
 
-        # Baudrate
-        f2 = tk.Frame(self.contenido, bg=T("BG"))
-        f2.pack(fill="x", padx=24, pady=4)
-        tk.Label(f2, text="Baudrate:", fg=T("TEXT"), bg=T("BG"),
-                 font=FONT_SMALL, width=20, anchor="w").pack(side="left")
-        self.var_baud = tk.StringVar(value=str(cfg.get("baudrate", 9600)))
-        ttk.Combobox(f2, textvariable=self.var_baud,
-                     values=["9600","19200","38400","115200"],
-                     state="readonly", width=10).pack(side="left")
+        saved = cfg.get("device_path", "")
+        initial = "✅ Dispositivo configurado — pulsá Detectar para ver detalles" if saved \
+                  else "— Pulsá Detectar para buscar el relé —"
+        self.var_device = tk.StringVar(value=initial)
+        self.combo_device = ttk.Combobox(f1, textvariable=self.var_device,
+                                         state="readonly", width=52)
+        self.combo_device.pack(side="left")
 
-        # Tipo de comando
-        f3 = tk.Frame(self.contenido, bg=T("BG"))
-        f3.pack(fill="x", padx=24, pady=4)
-        tk.Label(f3, text="Tipo de comando:", fg=T("TEXT"), bg=T("BG"),
-                 font=FONT_SMALL, width=20, anchor="w").pack(side="left")
-        nombres_cmd = [c[0] for c in COMANDOS_DISPONIBLES]
-        self._var_cmd_str = tk.StringVar(value=nombres_cmd[cfg.get("comando_idx", 0)])
-        self._combo_cmd = ttk.Combobox(f3, textvariable=self._var_cmd_str,
-                                       values=nombres_cmd, state="readonly", width=36)
-        self._combo_cmd.pack(side="left")
-
-        # Tiempo de apertura
+        # ── Tiempo de apertura ────────────────────────────────────────────────
         f4 = tk.Frame(self.contenido, bg=T("BG"))
         f4.pack(fill="x", padx=24, pady=4)
         tk.Label(f4, text="Tiempo apertura (seg):", fg=T("TEXT"), bg=T("BG"),
@@ -740,7 +718,7 @@ class PanelAdmin(tk.Frame):
                    font=FONT_LABEL, relief="flat",
                    buttonbackground=T("SEP")).pack(side="left")
 
-        # Modo simulación
+        # ── Modo simulación ───────────────────────────────────────────────────
         f5 = tk.Frame(self.contenido, bg=T("BG"))
         f5.pack(fill="x", padx=24, pady=4)
         self.var_sim = tk.BooleanVar(value=cfg.get("simulacion", False))
@@ -756,7 +734,6 @@ class PanelAdmin(tk.Frame):
 
         fb = tk.Frame(self.contenido, bg=T("BG"))
         fb.pack(fill="x", padx=24, pady=4)
-
         boton(fb, "💾 Guardar configuración", self._guardar_config_puerta
               ).pack(side="left", padx=4)
         boton(fb, "🔌 Test de conexión", self._test_conexion_puerta,
@@ -764,7 +741,6 @@ class PanelAdmin(tk.Frame):
         boton(fb, "🚪 Test apertura (2 seg)", self._test_apertura_puerta,
               color="#555", fg="white").pack(side="left", padx=4)
 
-        # Label de resultado del test de conexión
         self.lbl_test = tk.Label(self.contenido, text="",
                                   font=FONT_BOLD, bg=T("BG"))
         self.lbl_test.pack(anchor="w", padx=24, pady=(8, 0))
@@ -773,7 +749,7 @@ class PanelAdmin(tk.Frame):
         tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(
             fill="x", padx=24, pady=10)
         tk.Label(self.contenido, text="Simulación de carteles (sin DNI real)",
-                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0,6))
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 6))
 
         fb2 = tk.Frame(self.contenido, bg=T("BG"))
         fb2.pack(fill="x", padx=24, pady=4)
@@ -789,7 +765,7 @@ class PanelAdmin(tk.Frame):
 
         tk.Label(self.contenido,
                  text="Los carteles se muestran en el monitor externo igual que cuando llega un socio.",
-                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24, pady=(4,0))
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24, pady=(4, 0))
 
     def _simular_cartel(self, tipo):
         """Dispara el cartel en la ventana de acceso como si llegara un socio real."""
@@ -825,14 +801,51 @@ class PanelAdmin(tk.Frame):
         else:
             ventana._estado_no_encontrado()
 
+    def _detectar_hid(self):
+        dispositivos = listar_dispositivos_hid()
+        self._hid_devices = dispositivos
+        if not dispositivos:
+            self.combo_device.configure(values=["— No se encontraron dispositivos HID —"])
+            self.combo_device.current(0)
+            self.lbl_test.config(text="No se encontraron dispositivos HID.", fg=ERROR)
+            return
+
+        def label(d):
+            desc = d.get("product_string") or d.get("manufacturer_string") or "Desconocido"
+            return f"VID:{d['vendor_id']:#06x}  PID:{d['product_id']:#06x}  —  {desc}"
+
+        labels = [label(d) for d in dispositivos]
+        self.combo_device.configure(values=labels)
+
+        # Preseleccionar el dispositivo ya configurado si sigue conectado
+        saved = puerta.cfg.get("device_path", "")
+        for i, d in enumerate(dispositivos):
+            p = d.get("path", b"")
+            if isinstance(p, bytes):
+                p = p.decode("utf-8", errors="replace")
+            if p == saved:
+                self.combo_device.current(i)
+                self.lbl_test.config(
+                    text=f"{len(dispositivos)} dispositivo(s) encontrado(s) — dispositivo guardado preseleccionado.",
+                    fg=OK)
+                return
+
+        self.combo_device.current(0)
+        self.lbl_test.config(
+            text=f"{len(dispositivos)} dispositivo(s) encontrado(s) — seleccioná el relé y guardá.",
+            fg=WARN)
+
     def _guardar_config_puerta(self):
-        nombres_cmd = [c[0] for c in COMANDOS_DISPONIBLES]
-        cmd_sel = self._var_cmd_str.get()
-        cmd_idx = nombres_cmd.index(cmd_sel) if cmd_sel in nombres_cmd else 0
+        idx = self.combo_device.current()
+        if self._hid_devices and 0 <= idx < len(self._hid_devices):
+            raw = self._hid_devices[idx].get("path", b"")
+            device_path = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+        else:
+            # No se detectó todavía: conservar el path guardado
+            device_path = puerta.cfg.get("device_path", "")
+
         nueva_cfg = {
-            "puerto":          self.var_puerto.get(),
-            "baudrate":        int(self.var_baud.get()),
-            "comando_idx":     cmd_idx,
+            "device_path":    device_path,
             "tiempo_apertura": self.var_tiempo.get(),
             "simulacion":      self.var_sim.get(),
         }

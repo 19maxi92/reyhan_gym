@@ -66,7 +66,7 @@ class VentanaAcceso(tk.Toplevel):
 
         # Logo / nombre gimnasio
         logo_path = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "icon", "reyhan_logo.jpg")
+            os.path.abspath(__file__))), "icon", "reyhan_icon.png")
         self._logo_img = None
         if PIL_OK and os.path.exists(logo_path):
             try:
@@ -202,10 +202,12 @@ class VentanaAcceso(tk.Toplevel):
         elif event.keysym == "BackSpace":
             actual = self.var_dni.get()
             self.var_dni.set(actual[:-1])
+            return "break"
         elif event.char and event.char.isdigit():
             actual = self.var_dni.get()
             if len(actual) < 10:  # DNI máximo 8 dígitos + margen
                 self.var_dni.set(actual + event.char)
+            return "break"
 
     def _procesar_dni(self):
         dni = self.var_dni.get().strip()

@@ -67,5 +67,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     test_puerto(puerto)
-    print("\nGuardá el comando que funcionó y actualizalo en core/puerta.py")
-    print("Líneas COMANDO_ABRIR y COMANDO_CERRAR.")
+    print("\nGuardá el índice del comando que funcionó.")
+    print("Entrá al Panel Admin → sección Puerta → seleccioná el tipo de comando y guardá.")
