@@ -53,8 +53,8 @@ class VentanaAcceso(tk.Toplevel):
         self._build_ui(monitor_w, monitor_h)
         self._estado_espera()
 
-        # Capturar teclas del numpad en esta ventana
-        self.bind("<Key>", self._on_key)
+        # Capturar teclas del numpad directamente en el Entry (no en el Toplevel)
+        # para que return "break" bloquee el procesamiento nativo antes de que inserte
         self.after(100, self._tomar_foco)
 
     # ─── UI ───────────────────────────────────────────────────────────────────
@@ -116,6 +116,7 @@ class VentanaAcceso(tk.Toplevel):
         )
         self.entry_dni.place(relx=0.5, rely=0.38, anchor="center",
                              width=480, height=80)
+        self.entry_dni.bind("<Key>", self._on_key)
 
         # Área de mensaje (ok / error) — posición relativa más arriba
         self.frame_msg = tk.Frame(self, bg=COLOR_FONDO)
