@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#525252"/>
+      <stop offset="100%" style="stop-color:#3a3a3a"/>
+    </linearGradient>
+    <linearGradient id="orangeGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f4812e"/>
+      <stop offset="100%" style="stop-color:#d96818"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Fondo gris como el logo -->
+  <rect width="256" height="256" rx="36" ry="36" fill="url(#bgGrad)"/>
+
+  <!-- Franja naranja izquierda -->
+  <rect x="0" y="0" width="12" height="256" rx="0" fill="url(#orangeGrad)"/>
+  <rect x="0" y="0" width="12" height="36" rx="36" fill="url(#orangeGrad)"/>
+  <rect x="0" y="220" width="12" height="36" rx="36" fill="url(#orangeGrad)"/>
+
+  <!-- REYHAN texto blanco -->
+  <text x="136" y="118"
+        font-family="'Arial Black', 'Impact', sans-serif"
+        font-size="56"
+        font-weight="900"
+        fill="#ffffff"
+        text-anchor="middle"
+        letter-spacing="0">REYHAN</text>
+
+  <!-- CENTRO DE ENTRENAMIENTO naranja -->
+  <text x="136" y="143"
+        font-family="'Arial', sans-serif"
+        font-size="13"
+        font-weight="700"
+        fill="#f4812e"
+        text-anchor="middle"
+        letter-spacing="2">CENTRO DE ENTRENAMIENTO</text>
+
+  <!-- Línea separadora -->
+  <rect x="30" y="156" width="145" height="3" rx="1.5" fill="#f4812e" opacity="0.7"/>
+
+  <!-- Runner naranja -->
+  <circle cx="200" cy="172" r="9" fill="#f4812e"/>
+  <line x1="200" y1="181" x2="186" y2="204" stroke="#f4812e" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="196" y1="189" x2="210" y2="197" stroke="#f4812e" stroke-width="4" stroke-linecap="round"/>
+  <line x1="196" y1="189" x2="183" y2="182" stroke="#f4812e" stroke-width="4" stroke-linecap="round"/>
+  <line x1="186" y1="204" x2="200" y2="222" stroke="#f4812e" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="186" y1="204" x2="171" y2="215" stroke="#f4812e" stroke-width="5.5" stroke-linecap="round"/>
+  <line x1="200" y1="222" x2="213" y2="219" stroke="#f4812e" stroke-width="4" stroke-linecap="round"/>
+</svg>

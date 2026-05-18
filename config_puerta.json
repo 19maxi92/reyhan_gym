@@ -1,0 +1,7 @@
+{
+  "puerto": "COM3",
+  "baudrate": 9600,
+  "comando_idx": 0,
+  "tiempo_apertura": 3,
+  "simulacion": false
+}
