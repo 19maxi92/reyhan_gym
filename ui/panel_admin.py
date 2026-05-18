@@ -68,6 +68,7 @@ def entrada(parent, textvariable=None, width=30, **kw):
     return tk.Entry(
         parent, textvariable=textvariable, width=width,
         bg=T("ENTRADA_BG"), fg=T("TEXT"), insertbackground=T("TEXT"),
+        selectbackground=T("ACENTO"), selectforeground="#ffffff",
         relief="flat", font=FONT_LABEL,
         highlightthickness=1,
         highlightbackground=T("SEP"),
@@ -77,7 +78,7 @@ def entrada(parent, textvariable=None, width=30, **kw):
 
 def boton(parent, text, command, color=None, fg=None, **kw):
     c  = color or T("ACENTO")
-    fg = fg or ("#000000" if _tema["actual"] == "dark" else "#ffffff")
+    fg = fg or "#ffffff"
     return tk.Button(
         parent, text=text, command=command,
         bg=c, fg=fg, font=FONT_BOLD,
