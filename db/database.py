@@ -1,10 +1,18 @@
 import sqlite3
 import os
+import sys
 import shutil
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gym.db")
+# Al correr como .exe (PyInstaller) __file__ apunta al temp de extracción;
+# sys.executable apunta al .exe real. Desde fuente, usamos abspath normal.
+if getattr(sys, "frozen", False):
+    _BASE = os.path.dirname(sys.executable)
+else:
+    _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+DB_PATH    = os.path.join(_BASE, "gym.db")
 BACKUP_DIR = "C:/backup_gym"
 
 

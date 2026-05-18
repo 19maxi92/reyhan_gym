@@ -160,17 +160,18 @@ class VentanaAcceso(tk.Toplevel):
         self._tomar_foco()
 
     def _estado_ok(self, socio):
+        self.var_dni.set("")  # limpiar ya para evitar re-procesamiento
         nombre = f"{socio['nombre']} {socio['apellido']}"
         self.lbl_instruccion.config(text="¡Bienvenido!", fg=COLOR_OK)
         self.lbl_icono.config(text="✅", fg=COLOR_OK)
         self.lbl_msg.config(text=nombre, fg=COLOR_OK)
         self.lbl_submsg.config(text="Acceso habilitado", fg="#aaaaaa")
         self.entry_dni.config(fg=COLOR_OK, highlightbackground=COLOR_OK)
-        # Abrir la puerta en hilo aparte
         threading.Thread(target=puerta.abrir, daemon=True).start()
         self._volver_en(TIEMPO_MENSAJE)
 
     def _estado_vencida(self, socio):
+        self.var_dni.set("")
         nombre = f"{socio['nombre']} {socio['apellido']}"
         self.lbl_instruccion.config(text="Cuota vencida", fg=COLOR_ERROR)
         self.lbl_icono.config(text="❌", fg=COLOR_ERROR)
@@ -183,6 +184,7 @@ class VentanaAcceso(tk.Toplevel):
         self._volver_en(TIEMPO_MENSAJE)
 
     def _estado_no_encontrado(self):
+        self.var_dni.set("")
         self.lbl_instruccion.config(text="Socio no encontrado", fg=COLOR_WARN)
         self.lbl_icono.config(text="⚠️", fg=COLOR_WARN)
         self.lbl_msg.config(text="DNI no registrado", fg=COLOR_WARN)
@@ -200,6 +202,7 @@ class VentanaAcceso(tk.Toplevel):
         # Solo dígitos y Enter/KP_Enter
         if event.keysym in ("Return", "KP_Enter"):
             self._procesar_dni()
+            return "break"
         elif event.keysym == "BackSpace":
             actual = self.var_dni.get()
             self.var_dni.set(actual[:-1])
