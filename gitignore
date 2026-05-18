@@ -1,0 +1,29 @@
+# Base de datos (datos reales del gym, no va al repo)
+*.db
+*.db-shm
+*.db-wal
+
+# Config de la puerta (tiene datos del hardware específico)
+config_puerta.json
+
+# Build artifacts
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc
+*.pyo
+
+# Backup
+backup_gym/
+
+# Variables de entorno
+.env
+
+# IDEs
+.vscode/
+.idea/
+
+# Windows
+Thumbs.db
+desktop.ini
