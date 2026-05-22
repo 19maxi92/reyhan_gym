@@ -157,6 +157,16 @@ class PanelAdmin(tk.Frame):
         )
         self.btn_tema.pack(side="bottom", fill="x")
 
+        self.btn_monitor = tk.Button(
+            self.sidebar, text="📺  Activar Monitor",
+            command=self._activar_monitor,
+            bg=T("ACENTO"), fg="#ffffff",
+            font=("Segoe UI", 10, "bold"), relief="flat",
+            cursor="hand2", pady=10,
+            activebackground=T("ACENTO"), activeforeground="#ffffff"
+        )
+        self.btn_monitor.pack(side="bottom", fill="x")
+
         # Área de contenido
         self.contenido = tk.Frame(self, bg=T("BG"))
         self.contenido.pack(side="left", fill="both", expand=True)
@@ -188,6 +198,7 @@ class PanelAdmin(tk.Frame):
                 bg=T("SIDEBAR_BG"), fg=T("TEXT"),
                 activebackground=T("SIDEBAR_ACT"), activeforeground=T("ACENTO")
             )
+        self.btn_monitor.configure(bg=T("ACENTO"), activebackground=T("ACENTO"))
         try:
             self.winfo_toplevel().configure(bg=T("BG"))
         except Exception:
@@ -879,24 +890,32 @@ class PanelAdmin(tk.Frame):
 
     def _simular_cartel(self, tipo):
         """Dispara el cartel en la ventana de acceso como si llegara un socio real."""
-        # Busca la ventana de acceso entre los Toplevel activos
-        ventana = None
+    def _activar_monitor(self):
+        """Devuelve el foco al campo DNI del monitor externo."""
+        ventana = self._buscar_ventana_acceso()
+        if ventana:
+            try:
+                ventana.focus_force()
+                ventana.entry_dni.focus_set()
+            except Exception:
+                pass
+
+    def _buscar_ventana_acceso(self):
         try:
             for w in self.winfo_toplevel().winfo_children():
                 if hasattr(w, '_estado_ok'):
-                    ventana = w
-                    break
-            # También buscar en el master raíz
-            if not ventana:
-                root = self.winfo_toplevel().master
-                if root:
-                    for w in root.winfo_children():
-                        if hasattr(w, '_estado_ok'):
-                            ventana = w
-                            break
+                    return w
+            root = self.winfo_toplevel().master
+            if root:
+                for w in root.winfo_children():
+                    if hasattr(w, '_estado_ok'):
+                        return w
         except Exception:
             pass
+        return None
 
+    def _simular_cartel(self, tipo):
+        ventana = self._buscar_ventana_acceso()
         if not ventana:
             messagebox.showwarning("Sin pantalla de acceso",
                 "No se detectó la ventana de acceso activa.\nAsegurate de que el monitor externo esté conectado y el sistema iniciado.",
