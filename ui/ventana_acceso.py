@@ -7,8 +7,12 @@ No tiene botones ni nada que tocar; todo es automático.
 
 import tkinter as tk
 import threading
+import time
 import sys
 import os
+
+# Estado compartido: el dashboard lee esto para mostrar el último acceso
+ultimo_acceso = {"tipo": None, "nombre": "", "dni": "", "ts": 0}
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -218,6 +222,11 @@ class VentanaAcceso(tk.Toplevel):
         if not dni:
             return
         resultado, socio = verificar_acceso(dni)
+        nombre = f"{socio['nombre']} {socio['apellido']}" if socio else ""
+        ultimo_acceso["tipo"]   = resultado
+        ultimo_acceso["nombre"] = nombre
+        ultimo_acceso["dni"]    = dni
+        ultimo_acceso["ts"]     = time.time()
         if resultado == "ok":
             self._estado_ok(socio)
         elif resultado == "vencida":

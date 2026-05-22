@@ -7,6 +7,7 @@ import threading
 import time
 import json
 import os
+import sys
 
 try:
     import hid
@@ -14,7 +15,11 @@ try:
 except ImportError:
     HID_AVAILABLE = False
 
-BASE_DIR    = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, "frozen", False):
+    BASE_DIR = os.path.dirname(sys.executable)
+else:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 CONFIG_PATH = os.path.join(BASE_DIR, "config_puerta.json")
 
 TIEMPO_APERTURA = 3
