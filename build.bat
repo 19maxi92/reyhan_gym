@@ -16,7 +16,7 @@ echo  Sistema de Gestión — Build Script
 echo.
 
 echo [1/3] Instalando dependencias...
-pip install pyinstaller python-dateutil hid screeninfo pillow --quiet
+python -m pip install pyinstaller python-dateutil hidapi screeninfo pillow --quiet
 if %errorlevel% neq 0 (
     echo ERROR: Fallo la instalacion de dependencias.
     pause
@@ -24,7 +24,7 @@ if %errorlevel% neq 0 (
 )
 
 echo [2/3] Generando ejecutable...
-pyinstaller ^
+python -m PyInstaller ^
     --onefile ^
     --windowed ^
     --name "SistemaReyhan" ^

@@ -12,6 +12,7 @@ from datetime import date
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import db.database as db
 from core.puerta import puerta, listar_dispositivos_hid, guardar_config
+from ui.ventana_acceso import ultimo_acceso
 
 # ─── TEMAS ─────────────────────────────────────────────────────────────────────
 TEMAS = {
@@ -68,6 +69,7 @@ def entrada(parent, textvariable=None, width=30, **kw):
     return tk.Entry(
         parent, textvariable=textvariable, width=width,
         bg=T("ENTRADA_BG"), fg=T("TEXT"), insertbackground=T("TEXT"),
+        selectbackground=T("ACENTO"), selectforeground="#ffffff",
         relief="flat", font=FONT_LABEL,
         highlightthickness=1,
         highlightbackground=T("SEP"),
@@ -77,7 +79,7 @@ def entrada(parent, textvariable=None, width=30, **kw):
 
 def boton(parent, text, command, color=None, fg=None, **kw):
     c  = color or T("ACENTO")
-    fg = fg or ("#000000" if _tema["actual"] == "dark" else "#ffffff")
+    fg = fg or "#ffffff"
     return tk.Button(
         parent, text=text, command=command,
         bg=c, fg=fg, font=FONT_BOLD,
@@ -193,6 +195,12 @@ class PanelAdmin(tk.Frame):
 
     # ─── HELPERS ──────────────────────────────────────────────────────────────
     def _limpiar(self):
+        if hasattr(self, "_poll_id") and self._poll_id:
+            try:
+                self.contenido.after_cancel(self._poll_id)
+            except Exception:
+                pass
+            self._poll_id = None
         for w in self.contenido.winfo_children():
             w.destroy()
 
@@ -286,6 +294,52 @@ class PanelAdmin(tk.Frame):
             tk.Label(fc, text="No hay cumpleaños este mes.",
                      fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w")
 
+        # ── Mini monitor — último acceso del monitor externo ──────────────────
+        fm = tk.Frame(self.contenido, bg=T("CARD_BG"), padx=20, pady=12)
+        fm.pack(fill="x", padx=24, pady=(8, 16))
+        tk.Label(fm, text="🖥  Último acceso (monitor externo)",
+                 font=FONT_BOLD, fg=T("ACENTO"), bg=T("CARD_BG")).pack(anchor="w")
+        self.lbl_ua_estado = tk.Label(fm, text="— Sin actividad —",
+                                      font=("Segoe UI", 12, "bold"),
+                                      fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self.lbl_ua_estado.pack(anchor="w", pady=(4, 0))
+        self.lbl_ua_nombre = tk.Label(fm, text="",
+                                      font=FONT_LABEL, fg=T("TEXT"), bg=T("CARD_BG"))
+        self.lbl_ua_nombre.pack(anchor="w")
+        self.lbl_ua_hace   = tk.Label(fm, text="",
+                                      font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self.lbl_ua_hace.pack(anchor="w")
+
+        self._poll_id = None
+        self._poll_acceso()
+
+    def _poll_acceso(self):
+        import time as _t
+        tipo = ultimo_acceso.get("tipo")
+        ts   = ultimo_acceso.get("ts", 0)
+        if tipo and ts:
+            hace = int(_t.time() - ts)
+            if hace < 60:
+                hace_txt = f"hace {hace}s"
+            elif hace < 3600:
+                hace_txt = f"hace {hace // 60}min"
+            else:
+                hace_txt = f"hace {hace // 3600}h"
+            if tipo == "ok":
+                estado_txt, color = "✅  Acceso habilitado", OK
+            elif tipo == "vencida":
+                estado_txt, color = "❌  Cuota vencida", ERROR
+            else:
+                estado_txt, color = "⚠️  DNI no registrado", WARN
+            nombre = ultimo_acceso.get("nombre") or ultimo_acceso.get("dni", "")
+            try:
+                self.lbl_ua_estado.config(text=estado_txt, fg=color)
+                self.lbl_ua_nombre.config(text=nombre)
+                self.lbl_ua_hace.config(text=hace_txt)
+            except Exception:
+                return
+        self._poll_id = self.contenido.after(2000, self._poll_acceso)
+
     # ══════════════════════════════════════════════════════════════════════════
     # SOCIOS
     # ══════════════════════════════════════════════════════════════════════════
@@ -302,9 +356,19 @@ class PanelAdmin(tk.Frame):
         tk.Label(bar, text="  🔍 Nombre, DNI, celular...",
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(side="left")
         boton(bar, "+ Nuevo Socio", self._form_nuevo_socio).pack(side="right")
+        boton(bar, "⬇ Exportar CSV", self._exportar_csv,
+              color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="right", padx=4)
 
-        cols = ("DNI", "Apellido", "Nombre", "Celular", "Plan", "Estado")
+        cols = ("DNI", "Apellido", "Nombre", "Celular", "Plan", "Estado", "Vence", "Alta")
         ft, self.tree_socios = self._tabla(self.contenido, cols)
+        self.tree_socios.column("DNI",      width=85,  anchor="w")
+        self.tree_socios.column("Apellido", width=120, anchor="w")
+        self.tree_socios.column("Nombre",   width=110, anchor="w")
+        self.tree_socios.column("Celular",  width=100, anchor="w")
+        self.tree_socios.column("Plan",     width=155, anchor="w")
+        self.tree_socios.column("Estado",   width=85,  anchor="center")
+        self.tree_socios.column("Vence",    width=88,  anchor="center")
+        self.tree_socios.column("Alta",     width=88,  anchor="center")
         ft.pack(fill="both", expand=True, padx=24, pady=8)
         self.tree_socios.bind("<Double-1>", lambda e: self._abrir_socio())
         tk.Label(self.contenido, text="Doble click para editar",
@@ -317,10 +381,13 @@ class PanelAdmin(tk.Frame):
         self.tree_socios.delete(*self.tree_socios.get_children())
         for s in socios:
             vigente = db.cuota_vigente(s["id"])
+            pagos   = db.get_pagos_socio(s["id"])
+            vence   = pagos[0]["fecha_vencimiento"] if pagos else "-"
             self.tree_socios.insert("", "end", iid=s["id"], values=(
                 s["dni"], s["apellido"], s["nombre"],
                 s["celular"] or "-", s["plan_nombre"] or "-",
-                "✅ Al día" if vigente else "❌ Vencida"
+                "✅ Al día" if vigente else "❌ Vencida",
+                vence, s.get("fecha_alta", "-") or "-"
             ))
 
     def _abrir_socio(self):
@@ -383,6 +450,17 @@ class PanelAdmin(tk.Frame):
             combo.current(0)
         combo.grid(row=0, column=1, sticky="ew")
 
+        # Checkbox pago inmediato — solo visible al crear nuevo socio
+        var_pago_ya = tk.BooleanVar(value=True)
+        if not socio:
+            fc = tk.Frame(win, bg=T("BG"))
+            fc.pack(fill="x", padx=20, pady=(8, 2))
+            tk.Checkbutton(fc, text="✅ Registrar pago del mes actual",
+                           variable=var_pago_ya,
+                           bg=T("BG"), fg=T("TEXT"), selectcolor=T("ENTRADA_BG"),
+                           activebackground=T("BG"), activeforeground=T("TEXT"),
+                           font=FONT_SMALL).pack(side="left")
+
         def guardar():
             dni      = campos["dni"].get().strip()
             nombre   = campos["nombre"].get().strip()
@@ -405,6 +483,11 @@ class PanelAdmin(tk.Frame):
                 if not ok:
                     messagebox.showerror("Error", msg, parent=win)
                     return
+                if var_pago_ya.get():
+                    nuevo = db.get_socio_por_dni(dni)
+                    if nuevo:
+                        vence = db.registrar_pago(nuevo["id"])
+                        msg += f"\nPago registrado — vence: {vence}"
                 messagebox.showinfo("Guardado", msg, parent=win)
             win.destroy()
             self._actualizar_lista()
@@ -436,6 +519,33 @@ class PanelAdmin(tk.Frame):
               color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="right", padx=4)
 
     # ══════════════════════════════════════════════════════════════════════════
+    def _exportar_csv(self):
+        import csv
+        from tkinter import filedialog
+        ruta = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV", "*.csv")],
+            initialfile="socios_reyhan.csv",
+            title="Exportar socios"
+        )
+        if not ruta:
+            return
+        socios = db.buscar_socios("")
+        campos = ["id", "dni", "apellido", "nombre", "celular",
+                  "plan_nombre", "fecha_alta", "fecha_nacimiento",
+                  "email", "observaciones", "vencimiento"]
+        try:
+            with open(ruta, "w", newline="", encoding="utf-8-sig") as f:
+                w = csv.DictWriter(f, fieldnames=campos, extrasaction="ignore")
+                w.writeheader()
+                for s in socios:
+                    pagos = db.get_pagos_socio(s["id"])
+                    s["vencimiento"] = pagos[0]["fecha_vencimiento"] if pagos else ""
+                    w.writerow(s)
+            messagebox.showinfo("Exportado", f"CSV guardado en:\n{ruta}")
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
     # PAGOS
     # ══════════════════════════════════════════════════════════════════════════
     def mostrar_pagos(self):

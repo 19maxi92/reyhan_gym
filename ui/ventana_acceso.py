@@ -7,8 +7,12 @@ No tiene botones ni nada que tocar; todo es automático.
 
 import tkinter as tk
 import threading
+import time
 import sys
 import os
+
+# Estado compartido: el dashboard lee esto para mostrar el último acceso
+ultimo_acceso = {"tipo": None, "nombre": "", "dni": "", "ts": 0}
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -53,8 +57,8 @@ class VentanaAcceso(tk.Toplevel):
         self._build_ui(monitor_w, monitor_h)
         self._estado_espera()
 
-        # Capturar teclas del numpad en esta ventana
-        self.bind("<Key>", self._on_key)
+        # Capturar teclas del numpad directamente en el Entry (no en el Toplevel)
+        # para que return "break" bloquee el procesamiento nativo antes de que inserte
         self.after(100, self._tomar_foco)
 
     # ─── UI ───────────────────────────────────────────────────────────────────
@@ -116,6 +120,7 @@ class VentanaAcceso(tk.Toplevel):
         )
         self.entry_dni.place(relx=0.5, rely=0.38, anchor="center",
                              width=480, height=80)
+        self.entry_dni.bind("<Key>", self._on_key)
 
         # Área de mensaje (ok / error) — posición relativa más arriba
         self.frame_msg = tk.Frame(self, bg=COLOR_FONDO)
@@ -159,17 +164,18 @@ class VentanaAcceso(tk.Toplevel):
         self._tomar_foco()
 
     def _estado_ok(self, socio):
+        self.var_dni.set("")  # limpiar ya para evitar re-procesamiento
         nombre = f"{socio['nombre']} {socio['apellido']}"
         self.lbl_instruccion.config(text="¡Bienvenido!", fg=COLOR_OK)
         self.lbl_icono.config(text="✅", fg=COLOR_OK)
         self.lbl_msg.config(text=nombre, fg=COLOR_OK)
         self.lbl_submsg.config(text="Acceso habilitado", fg="#aaaaaa")
         self.entry_dni.config(fg=COLOR_OK, highlightbackground=COLOR_OK)
-        # Abrir la puerta en hilo aparte
         threading.Thread(target=puerta.abrir, daemon=True).start()
         self._volver_en(TIEMPO_MENSAJE)
 
     def _estado_vencida(self, socio):
+        self.var_dni.set("")
         nombre = f"{socio['nombre']} {socio['apellido']}"
         self.lbl_instruccion.config(text="Cuota vencida", fg=COLOR_ERROR)
         self.lbl_icono.config(text="❌", fg=COLOR_ERROR)
@@ -182,6 +188,7 @@ class VentanaAcceso(tk.Toplevel):
         self._volver_en(TIEMPO_MENSAJE)
 
     def _estado_no_encontrado(self):
+        self.var_dni.set("")
         self.lbl_instruccion.config(text="Socio no encontrado", fg=COLOR_WARN)
         self.lbl_icono.config(text="⚠️", fg=COLOR_WARN)
         self.lbl_msg.config(text="DNI no registrado", fg=COLOR_WARN)
@@ -199,6 +206,7 @@ class VentanaAcceso(tk.Toplevel):
         # Solo dígitos y Enter/KP_Enter
         if event.keysym in ("Return", "KP_Enter"):
             self._procesar_dni()
+            return "break"
         elif event.keysym == "BackSpace":
             actual = self.var_dni.get()
             self.var_dni.set(actual[:-1])
@@ -214,6 +222,11 @@ class VentanaAcceso(tk.Toplevel):
         if not dni:
             return
         resultado, socio = verificar_acceso(dni)
+        nombre = f"{socio['nombre']} {socio['apellido']}" if socio else ""
+        ultimo_acceso["tipo"]   = resultado
+        ultimo_acceso["nombre"] = nombre
+        ultimo_acceso["dni"]    = dni
+        ultimo_acceso["ts"]     = time.time()
         if resultado == "ok":
             self._estado_ok(socio)
         elif resultado == "vencida":
