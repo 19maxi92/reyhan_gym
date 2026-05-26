@@ -463,6 +463,7 @@ class PanelAdmin(tk.Frame):
 
         # Checkbox pago inmediato — solo visible al crear nuevo socio
         var_pago_ya = tk.BooleanVar(value=True)
+        var_fecha_pago = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
         if not socio:
             fc = tk.Frame(win, bg=T("BG"))
             fc.pack(fill="x", padx=20, pady=(8, 2))
@@ -471,6 +472,9 @@ class PanelAdmin(tk.Frame):
                            bg=T("BG"), fg=T("TEXT"), selectcolor=T("ENTRADA_BG"),
                            activebackground=T("BG"), activeforeground=T("TEXT"),
                            font=FONT_SMALL).pack(side="left")
+            tk.Label(fc, text="  Fecha pago:", fg=T("TEXT_DIM"), bg=T("BG"),
+                     font=FONT_SMALL).pack(side="left")
+            entrada(fc, textvariable=var_fecha_pago, width=12).pack(side="left", ipady=2)
 
         def guardar():
             dni      = campos["dni"].get().strip()
@@ -497,7 +501,7 @@ class PanelAdmin(tk.Frame):
                 if var_pago_ya.get():
                     nuevo = db.get_socio_por_dni(dni)
                     if nuevo:
-                        vence = db.registrar_pago(nuevo["id"])
+                        vence = db.registrar_pago(nuevo["id"], var_fecha_pago.get() or None)
                         msg += f"\nPago registrado — vence: {vence}"
                 messagebox.showinfo("Guardado", msg, parent=win)
             win.destroy()
