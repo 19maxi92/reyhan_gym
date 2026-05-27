@@ -245,6 +245,12 @@ class PanelAdmin(tk.Frame):
 
     # ─── HELPERS ──────────────────────────────────────────────────────────────
     def _limpiar(self):
+        if hasattr(self, "_poll_id") and self._poll_id:
+            try:
+                self.contenido.after_cancel(self._poll_id)
+            except Exception:
+                pass
+            self._poll_id = None
         for w in self.contenido.winfo_children():
             w.destroy()
 
@@ -306,6 +312,23 @@ class PanelAdmin(tk.Frame):
             tk.Label(c, text=titulo, font=FONT_SMALL,
                      fg=T("TEXT_DIM"), bg=T("CARD_BG")).pack()
 
+        # Card último acceso — derecha del dashboard
+        ua_card = tk.Frame(frame_cards, bg=T("CARD_BG"), padx=20, pady=12)
+        ua_card.pack(side="right", padx=8, ipadx=10, fill="y")
+        tk.Label(ua_card, text="🖥  Último acceso",
+                 font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG")).pack(anchor="w")
+        self._lbl_dash_ua_estado = tk.Label(ua_card, text="— Sin actividad —",
+                                            font=FONT_BOLD, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_estado.pack(anchor="w", pady=(6, 2))
+        self._lbl_dash_ua_nombre = tk.Label(ua_card, text="",
+                                            font=FONT_LABEL, fg=T("TEXT"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_nombre.pack(anchor="w")
+        self._lbl_dash_ua_hace = tk.Label(ua_card, text="",
+                                          font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_hace.pack(anchor="w")
+        self._poll_id = None
+        self._poll_acceso_dashboard()
+
         # Próximos a vencer
         fp = tk.Frame(self.contenido, bg=T("BG"))
         fp.pack(fill="both", expand=True, padx=24, pady=8)
@@ -338,6 +361,28 @@ class PanelAdmin(tk.Frame):
             tk.Label(fc, text="No hay cumpleaños este mes.",
                      fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w")
 
+
+    def _poll_acceso_dashboard(self):
+        import time as _t
+        tipo = ultimo_acceso.get("tipo")
+        ts   = ultimo_acceso.get("ts", 0)
+        if tipo and ts:
+            hace = int(_t.time() - ts)
+            hace_txt = f"hace {hace}s" if hace < 60 else (f"hace {hace//60}min" if hace < 3600 else f"hace {hace//3600}h")
+            if tipo == "ok":
+                estado_txt, color = "✅  Acceso habilitado", OK
+            elif tipo == "vencida":
+                estado_txt, color = "❌  Cuota vencida", ERROR
+            else:
+                estado_txt, color = "⚠️  DNI no registrado", WARN
+            nombre = ultimo_acceso.get("nombre") or ultimo_acceso.get("dni", "")
+            try:
+                self._lbl_dash_ua_estado.config(text=estado_txt, fg=color)
+                self._lbl_dash_ua_nombre.config(text=nombre)
+                self._lbl_dash_ua_hace.config(text=hace_txt)
+            except Exception:
+                return
+        self._poll_id = self.contenido.after(2000, self._poll_acceso_dashboard)
 
     # ══════════════════════════════════════════════════════════════════════════
     # SOCIOS
