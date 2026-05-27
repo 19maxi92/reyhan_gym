@@ -7,7 +7,7 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import os
-from datetime import date
+from datetime import date, datetime
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import db.database as db
@@ -518,11 +518,42 @@ class PanelAdmin(tk.Frame):
                 messagebox.showerror("Faltan datos",
                     "DNI, Nombre, Apellido y Celular son obligatorios.", parent=win)
                 return
+            if not dni.isdigit() or not (5 <= len(dni) <= 9):
+                messagebox.showerror("DNI inválido",
+                    "El DNI debe tener entre 5 y 9 dígitos numéricos.", parent=win)
+                return
+            cel_limpio = celular.replace(" ", "").replace("-", "")
+            if not cel_limpio.isdigit() or len(cel_limpio) < 6:
+                messagebox.showerror("Celular inválido",
+                    "El celular debe contener solo números.", parent=win)
+                return
             plan_idx = combo.current()
-            plan_id  = plan_ids[plan_idx] if plan_idx >= 0 else None
-            fn   = campos["fecha_nacimiento"].get().strip() or None
+            if plan_idx < 0 or not plan_ids:
+                messagebox.showerror("Plan requerido",
+                    "Seleccioná un plan. Si no hay planes creá uno primero.", parent=win)
+                return
+            plan_id = plan_ids[plan_idx]
+            fn = campos["fecha_nacimiento"].get().strip() or None
+            if fn:
+                try:
+                    datetime.strptime(fn, "%Y-%m-%d")
+                except ValueError:
+                    messagebox.showerror("Fecha inválida",
+                        "Fecha de nacimiento debe ser AAAA-MM-DD (ej: 1990-03-15).", parent=win)
+                    return
             mail = campos["email"].get().strip() or None
+            if mail and ("@" not in mail or "." not in mail.split("@")[-1]):
+                messagebox.showerror("Email inválido",
+                    "El email no tiene un formato válido.", parent=win)
+                return
             obs  = campos["observaciones"].get().strip() or None
+            if not socio and var_pago_ya.get():
+                try:
+                    datetime.strptime(var_fecha_pago.get(), "%Y-%m-%d")
+                except ValueError:
+                    messagebox.showerror("Fecha de pago inválida",
+                        "La fecha de pago debe ser AAAA-MM-DD (ej: 2026-04-23).", parent=win)
+                    return
             if socio:
                 db.editar_socio(socio["id"], nombre, apellido, celular, plan_id, fn, mail, obs)
                 messagebox.showinfo("Guardado", "Socio actualizado.", parent=win)
@@ -707,7 +738,21 @@ class PanelAdmin(tk.Frame):
 
         def confirmar():
             try:
-                vence = db.registrar_pago(socio["id"], var_fecha.get(), var_meses.get())
+                datetime.strptime(var_fecha.get(), "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Fecha inválida",
+                    "Usá el formato AAAA-MM-DD (ej: 2026-04-23).", parent=win)
+                return
+            try:
+                meses = int(var_meses.get())
+            except (ValueError, TypeError):
+                messagebox.showerror("Meses inválido", "Cantidad de meses debe ser un número.", parent=win)
+                return
+            if not 1 <= meses <= 12:
+                messagebox.showerror("Meses inválido", "La cantidad de meses debe ser entre 1 y 12.", parent=win)
+                return
+            try:
+                vence = db.registrar_pago(socio["id"], var_fecha.get(), meses)
                 messagebox.showinfo("Listo", f"Pago registrado.\nVence: {vence}", parent=win)
                 win.destroy()
                 self._actualizar_lista_pagos()
