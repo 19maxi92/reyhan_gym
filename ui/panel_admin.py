@@ -112,9 +112,14 @@ class PanelAdmin(tk.Frame):
 
         # Logo sidebar
         icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
-        logo_path = os.path.join(icon_dir, "logo_sidebar.png")
+        logo_path = None
+        for _name in ("logo_sidebar.jpeg", "logo_sidebar.jpg", "logo_sidebar.png"):
+            _p = os.path.join(icon_dir, _name)
+            if os.path.exists(_p):
+                logo_path = _p
+                break
         self._sidebar_img = None
-        if PIL_OK and os.path.exists(logo_path):
+        if PIL_OK and logo_path and os.path.exists(logo_path):
             try:
                 pil_img = Image.open(logo_path).convert("RGBA")
                 ratio = min(172 / pil_img.width, 72 / pil_img.height)

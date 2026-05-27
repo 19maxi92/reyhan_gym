@@ -70,9 +70,10 @@ class VentanaAcceso(tk.Toplevel):
 
         # Logo / nombre gimnasio
         icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
-        logo_path = os.path.join(icon_dir, "logo_dark.png")
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(icon_dir, "reyhan_icon.png")
+        for _name in ("logo_dark.jpeg", "logo_dark.jpg", "logo_dark.png", "reyhan_icon.png"):
+            logo_path = os.path.join(icon_dir, _name)
+            if os.path.exists(logo_path):
+                break
         self._logo_img = None
         if PIL_OK and os.path.exists(logo_path):
             try:
