@@ -538,7 +538,9 @@ class PanelAdmin(tk.Frame):
                            font=FONT_SMALL).pack(side="left")
             tk.Label(fc, text="  Fecha pago:", fg=T("TEXT_DIM"), bg=T("BG"),
                      font=FONT_SMALL).pack(side="left")
-            entrada(fc, textvariable=var_fecha_pago, width=12).pack(side="left", ipady=2)
+            ent_fp = entrada(fc, textvariable=var_fecha_pago, width=12)
+            ent_fp.pack(side="left", ipady=2)
+            ent_fp.bind("<FocusIn>", lambda e: ent_fp.select_range(0, "end"))
 
         def guardar():
             dni      = campos["dni"].get().strip()
@@ -739,8 +741,10 @@ class PanelAdmin(tk.Frame):
         tk.Label(f1, text="Fecha de pago:", fg=T("TEXT"), bg=T("BG"),
                  font=FONT_SMALL, width=18, anchor="w").pack(side="left")
         var_fecha = tk.StringVar(value=date.today().strftime("%Y-%m-%d"))
-        entrada(f1, textvariable=var_fecha, width=16).pack(side="left", ipady=3)
-        tk.Label(f1, text="  (AAAA-MM-DD)", fg=T("TEXT_DIM"), bg=T("BG"),
+        ent_fecha = entrada(f1, textvariable=var_fecha, width=16)
+        ent_fecha.pack(side="left", ipady=3)
+        ent_fecha.bind("<FocusIn>", lambda e: ent_fecha.select_range(0, "end"))
+        tk.Label(f1, text="  (AAAA-MM-DD — click para editar)", fg=T("TEXT_DIM"), bg=T("BG"),
                  font=FONT_SMALL).pack(side="left")
 
         f2 = tk.Frame(win, bg=T("BG"))
