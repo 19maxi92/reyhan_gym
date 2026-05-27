@@ -69,14 +69,16 @@ class VentanaAcceso(tk.Toplevel):
         self.canvas.place(x=0, y=0, width=w, height=h)
 
         # Logo / nombre gimnasio
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__))), "icon", "reyhan_icon.png")
+        icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
+        logo_path = os.path.join(icon_dir, "logo_dark.png")
+        if not os.path.exists(logo_path):
+            logo_path = os.path.join(icon_dir, "reyhan_icon.png")
         self._logo_img = None
         if PIL_OK and os.path.exists(logo_path):
             try:
                 pil_img = Image.open(logo_path).convert("RGBA")
-                # Escalar manteniendo aspecto, max 200px ancho
-                ratio = min(200 / pil_img.width, 90 / pil_img.height)
+                max_w, max_h = int(w * 0.45), int(h * 0.18)
+                ratio = min(max_w / pil_img.width, max_h / pil_img.height)
                 nw, nh = int(pil_img.width * ratio), int(pil_img.height * ratio)
                 pil_img = pil_img.resize((nw, nh), Image.LANCZOS)
                 self._logo_img = ImageTk.PhotoImage(pil_img)
@@ -90,7 +92,7 @@ class VentanaAcceso(tk.Toplevel):
                 self, text="REYHAN", font=("Georgia", 32, "bold"),
                 fg=COLOR_ACENTO, bg=COLOR_FONDO
             )
-        self.lbl_gym.place(relx=0.5, rely=0.10, anchor="center")
+        self.lbl_gym.place(relx=0.5, rely=0.12, anchor="center")
 
         self.lbl_sep = tk.Label(
             self, text="─────────────────────",

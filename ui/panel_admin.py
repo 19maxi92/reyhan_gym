@@ -7,7 +7,13 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import sys
 import os
-from datetime import date
+from datetime import date, datetime
+
+try:
+    from PIL import Image, ImageTk
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import db.database as db
@@ -104,17 +110,36 @@ class PanelAdmin(tk.Frame):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        # Logo
-        self.lbl_gym = tk.Label(
-            self.sidebar, text="REYHAN", font=("Georgia", 22, "bold"),
-            fg=T("ACENTO"), bg=T("SIDEBAR_BG")
-        )
-        self.lbl_gym.pack(pady=(24, 2))
-        self.lbl_sub = tk.Label(
-            self.sidebar, text="Centro de Entrenamiento",
-            font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG")
-        )
-        self.lbl_sub.pack(pady=(0, 12))
+        # Logo sidebar
+        icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
+        logo_path = os.path.join(icon_dir, "logo_sidebar.png")
+        self._sidebar_img = None
+        if PIL_OK and os.path.exists(logo_path):
+            try:
+                pil_img = Image.open(logo_path).convert("RGBA")
+                ratio = min(172 / pil_img.width, 72 / pil_img.height)
+                nw, nh = int(pil_img.width * ratio), int(pil_img.height * ratio)
+                pil_img = pil_img.resize((nw, nh), Image.LANCZOS)
+                self._sidebar_img = ImageTk.PhotoImage(pil_img)
+            except Exception:
+                self._sidebar_img = None
+
+        if self._sidebar_img:
+            self.lbl_gym = tk.Label(self.sidebar, image=self._sidebar_img,
+                                    bg=T("SIDEBAR_BG"))
+            self.lbl_gym.pack(pady=(20, 12))
+            self.lbl_sub = None
+        else:
+            self.lbl_gym = tk.Label(
+                self.sidebar, text="REYHAN", font=("Georgia", 22, "bold"),
+                fg=T("ACENTO"), bg=T("SIDEBAR_BG")
+            )
+            self.lbl_gym.pack(pady=(24, 2))
+            self.lbl_sub = tk.Label(
+                self.sidebar, text="Centro de Entrenamiento",
+                font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG")
+            )
+            self.lbl_sub.pack(pady=(0, 12))
 
         self.sep_top = tk.Frame(self.sidebar, bg=T("SEP"), height=1)
         self.sep_top.pack(fill="x", padx=16, pady=(0, 8))
@@ -223,8 +248,9 @@ class PanelAdmin(tk.Frame):
         self.header_bar.configure(bg=T("CARD_BG"))
         self.lbl_hdr_ua.configure(bg=T("CARD_BG"))
         self.contenido.configure(bg=T("BG"))
-        self.lbl_gym.configure(fg=T("ACENTO"), bg=T("SIDEBAR_BG"))
-        self.lbl_sub.configure(fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG"))
+        self.lbl_gym.configure(bg=T("SIDEBAR_BG"))
+        if self.lbl_sub:
+            self.lbl_sub.configure(fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG"))
         self.sep_top.configure(bg=T("SEP"))
         self.sep_bot.configure(bg=T("SEP"))
         icono = "🌙  Modo Oscuro" if _tema["actual"] == "claro" else "☀  Modo Claro"
@@ -245,6 +271,12 @@ class PanelAdmin(tk.Frame):
 
     # ─── HELPERS ──────────────────────────────────────────────────────────────
     def _limpiar(self):
+        if hasattr(self, "_poll_id") and self._poll_id:
+            try:
+                self.contenido.after_cancel(self._poll_id)
+            except Exception:
+                pass
+            self._poll_id = None
         for w in self.contenido.winfo_children():
             w.destroy()
 
@@ -306,6 +338,23 @@ class PanelAdmin(tk.Frame):
             tk.Label(c, text=titulo, font=FONT_SMALL,
                      fg=T("TEXT_DIM"), bg=T("CARD_BG")).pack()
 
+        # Card último acceso — derecha del dashboard
+        ua_card = tk.Frame(frame_cards, bg=T("CARD_BG"), padx=20, pady=12)
+        ua_card.pack(side="right", padx=8, ipadx=10, fill="y")
+        tk.Label(ua_card, text="🖥  Último acceso",
+                 font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG")).pack(anchor="w")
+        self._lbl_dash_ua_estado = tk.Label(ua_card, text="— Sin actividad —",
+                                            font=FONT_BOLD, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_estado.pack(anchor="w", pady=(6, 2))
+        self._lbl_dash_ua_nombre = tk.Label(ua_card, text="",
+                                            font=FONT_LABEL, fg=T("TEXT"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_nombre.pack(anchor="w")
+        self._lbl_dash_ua_hace = tk.Label(ua_card, text="",
+                                          font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
+        self._lbl_dash_ua_hace.pack(anchor="w")
+        self._poll_id = None
+        self._poll_acceso_dashboard()
+
         # Próximos a vencer
         fp = tk.Frame(self.contenido, bg=T("BG"))
         fp.pack(fill="both", expand=True, padx=24, pady=8)
@@ -338,6 +387,28 @@ class PanelAdmin(tk.Frame):
             tk.Label(fc, text="No hay cumpleaños este mes.",
                      fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w")
 
+
+    def _poll_acceso_dashboard(self):
+        import time as _t
+        tipo = ultimo_acceso.get("tipo")
+        ts   = ultimo_acceso.get("ts", 0)
+        if tipo and ts:
+            hace = int(_t.time() - ts)
+            hace_txt = f"hace {hace}s" if hace < 60 else (f"hace {hace//60}min" if hace < 3600 else f"hace {hace//3600}h")
+            if tipo == "ok":
+                estado_txt, color = "✅  Acceso habilitado", OK
+            elif tipo == "vencida":
+                estado_txt, color = "❌  Cuota vencida", ERROR
+            else:
+                estado_txt, color = "⚠️  DNI no registrado", WARN
+            nombre = ultimo_acceso.get("nombre") or ultimo_acceso.get("dni", "")
+            try:
+                self._lbl_dash_ua_estado.config(text=estado_txt, fg=color)
+                self._lbl_dash_ua_nombre.config(text=nombre)
+                self._lbl_dash_ua_hace.config(text=hace_txt)
+            except Exception:
+                return
+        self._poll_id = self.contenido.after(2000, self._poll_acceso_dashboard)
 
     # ══════════════════════════════════════════════════════════════════════════
     # SOCIOS
@@ -473,11 +544,42 @@ class PanelAdmin(tk.Frame):
                 messagebox.showerror("Faltan datos",
                     "DNI, Nombre, Apellido y Celular son obligatorios.", parent=win)
                 return
+            if not dni.isdigit() or not (5 <= len(dni) <= 9):
+                messagebox.showerror("DNI inválido",
+                    "El DNI debe tener entre 5 y 9 dígitos numéricos.", parent=win)
+                return
+            cel_limpio = celular.replace(" ", "").replace("-", "")
+            if not cel_limpio.isdigit() or len(cel_limpio) < 6:
+                messagebox.showerror("Celular inválido",
+                    "El celular debe contener solo números.", parent=win)
+                return
             plan_idx = combo.current()
-            plan_id  = plan_ids[plan_idx] if plan_idx >= 0 else None
-            fn   = campos["fecha_nacimiento"].get().strip() or None
+            if plan_idx < 0 or not plan_ids:
+                messagebox.showerror("Plan requerido",
+                    "Seleccioná un plan. Si no hay planes creá uno primero.", parent=win)
+                return
+            plan_id = plan_ids[plan_idx]
+            fn = campos["fecha_nacimiento"].get().strip() or None
+            if fn:
+                try:
+                    datetime.strptime(fn, "%Y-%m-%d")
+                except ValueError:
+                    messagebox.showerror("Fecha inválida",
+                        "Fecha de nacimiento debe ser AAAA-MM-DD (ej: 1990-03-15).", parent=win)
+                    return
             mail = campos["email"].get().strip() or None
+            if mail and ("@" not in mail or "." not in mail.split("@")[-1]):
+                messagebox.showerror("Email inválido",
+                    "El email no tiene un formato válido.", parent=win)
+                return
             obs  = campos["observaciones"].get().strip() or None
+            if not socio and var_pago_ya.get():
+                try:
+                    datetime.strptime(var_fecha_pago.get(), "%Y-%m-%d")
+                except ValueError:
+                    messagebox.showerror("Fecha de pago inválida",
+                        "La fecha de pago debe ser AAAA-MM-DD (ej: 2026-04-23).", parent=win)
+                    return
             if socio:
                 db.editar_socio(socio["id"], nombre, apellido, celular, plan_id, fn, mail, obs)
                 messagebox.showinfo("Guardado", "Socio actualizado.", parent=win)
@@ -662,7 +764,21 @@ class PanelAdmin(tk.Frame):
 
         def confirmar():
             try:
-                vence = db.registrar_pago(socio["id"], var_fecha.get(), var_meses.get())
+                datetime.strptime(var_fecha.get(), "%Y-%m-%d")
+            except ValueError:
+                messagebox.showerror("Fecha inválida",
+                    "Usá el formato AAAA-MM-DD (ej: 2026-04-23).", parent=win)
+                return
+            try:
+                meses = int(var_meses.get())
+            except (ValueError, TypeError):
+                messagebox.showerror("Meses inválido", "Cantidad de meses debe ser un número.", parent=win)
+                return
+            if not 1 <= meses <= 12:
+                messagebox.showerror("Meses inválido", "La cantidad de meses debe ser entre 1 y 12.", parent=win)
+                return
+            try:
+                vence = db.registrar_pago(socio["id"], var_fecha.get(), meses)
                 messagebox.showinfo("Listo", f"Pago registrado.\nVence: {vence}", parent=win)
                 win.destroy()
                 self._actualizar_lista_pagos()
