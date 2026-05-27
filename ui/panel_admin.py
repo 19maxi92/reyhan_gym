@@ -122,7 +122,7 @@ class PanelAdmin(tk.Frame):
         if PIL_OK and logo_path and os.path.exists(logo_path):
             try:
                 pil_img = Image.open(logo_path).convert("RGBA")
-                ratio = min(172 / pil_img.width, 72 / pil_img.height)
+                ratio = min(188 / pil_img.width, 110 / pil_img.height)
                 nw, nh = int(pil_img.width * ratio), int(pil_img.height * ratio)
                 pil_img = pil_img.resize((nw, nh), Image.LANCZOS)
                 self._sidebar_img = ImageTk.PhotoImage(pil_img)
@@ -132,7 +132,7 @@ class PanelAdmin(tk.Frame):
         if self._sidebar_img:
             self.lbl_gym = tk.Label(self.sidebar, image=self._sidebar_img,
                                     bg=T("SIDEBAR_BG"))
-            self.lbl_gym.pack(pady=(20, 12))
+            self.lbl_gym.pack(pady=(16, 10))
             self.lbl_sub = None
         else:
             self.lbl_gym = tk.Label(
