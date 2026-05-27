@@ -113,6 +113,31 @@ def baja_socio(socio_id):
     conn.close()
 
 
+def get_socio_inactivo_por_dni(dni):
+    conn = get_conn()
+    row = conn.execute("""
+        SELECT s.*, p.nombre as plan_nombre
+        FROM socios s
+        LEFT JOIN planes p ON s.plan_id = p.id
+        WHERE s.dni = ? AND s.activo = 0
+    """, (dni,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def reactivar_socio(socio_id, nombre, apellido, celular, plan_id,
+                    fecha_nacimiento=None, email=None, observaciones=None):
+    conn = get_conn()
+    conn.execute("""
+        UPDATE socios SET activo=1, nombre=?, apellido=?, celular=?, plan_id=?,
+            fecha_nacimiento=?, email=?, observaciones=?
+        WHERE id=?
+    """, (nombre.strip(), apellido.strip(), celular, plan_id,
+          fecha_nacimiento, email, observaciones, socio_id))
+    conn.commit()
+    conn.close()
+
+
 def editar_socio(socio_id, nombre, apellido, celular, plan_id,
                  fecha_nacimiento=None, email=None, observaciones=None):
     conn = get_conn()

@@ -167,9 +167,25 @@ class PanelAdmin(tk.Frame):
         )
         self.btn_monitor.pack(side="bottom", fill="x")
 
-        # Área de contenido
-        self.contenido = tk.Frame(self, bg=T("BG"))
-        self.contenido.pack(side="left", fill="both", expand=True)
+        # Panel derecho (header fijo + contenido variable)
+        self.right_panel = tk.Frame(self, bg=T("BG"))
+        self.right_panel.pack(side="left", fill="both", expand=True)
+
+        # Header bar persistente — último acceso siempre visible
+        self.header_bar = tk.Frame(self.right_panel, bg=T("CARD_BG"), height=32)
+        self.header_bar.pack(fill="x", side="top")
+        self.header_bar.pack_propagate(False)
+        self.lbl_hdr_ua = tk.Label(
+            self.header_bar, text="🖥  Sin actividad",
+            font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG")
+        )
+        self.lbl_hdr_ua.pack(side="right", padx=16)
+
+        self.contenido = tk.Frame(self.right_panel, bg=T("BG"))
+        self.contenido.pack(fill="both", expand=True)
+
+        self._ua_poll_id = None
+        self._poll_acceso_global()
 
     # ─── TEMA ─────────────────────────────────────────────────────────────────
     def _toggle_tema(self):
@@ -180,9 +196,32 @@ class PanelAdmin(tk.Frame):
         else:
             self.mostrar_dashboard()
 
+    def _poll_acceso_global(self):
+        import time as _t
+        tipo = ultimo_acceso.get("tipo")
+        ts   = ultimo_acceso.get("ts", 0)
+        if tipo and ts:
+            hace = int(_t.time() - ts)
+            hace_txt = f"{hace}s" if hace < 60 else (f"{hace//60}min" if hace < 3600 else f"{hace//3600}h")
+            icono = "✅" if tipo == "ok" else ("❌" if tipo == "vencida" else "⚠️")
+            nombre = ultimo_acceso.get("nombre") or ultimo_acceso.get("dni", "")
+            color  = OK if tipo == "ok" else (ERROR if tipo == "vencida" else WARN)
+            txt    = f"🖥  {icono} {nombre} — hace {hace_txt}"
+        else:
+            txt, color = "🖥  Sin actividad", T("TEXT_DIM")
+        try:
+            self.lbl_hdr_ua.config(text=txt, fg=color, bg=T("CARD_BG"))
+            self.header_bar.config(bg=T("CARD_BG"))
+        except Exception:
+            return
+        self._ua_poll_id = self.after(2000, self._poll_acceso_global)
+
     def _aplicar_tema(self):
         self.configure(bg=T("BG"))
         self.sidebar.configure(bg=T("SIDEBAR_BG"))
+        self.right_panel.configure(bg=T("BG"))
+        self.header_bar.configure(bg=T("CARD_BG"))
+        self.lbl_hdr_ua.configure(bg=T("CARD_BG"))
         self.contenido.configure(bg=T("BG"))
         self.lbl_gym.configure(fg=T("ACENTO"), bg=T("SIDEBAR_BG"))
         self.lbl_sub.configure(fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG"))
@@ -206,12 +245,6 @@ class PanelAdmin(tk.Frame):
 
     # ─── HELPERS ──────────────────────────────────────────────────────────────
     def _limpiar(self):
-        if hasattr(self, "_poll_id") and self._poll_id:
-            try:
-                self.contenido.after_cancel(self._poll_id)
-            except Exception:
-                pass
-            self._poll_id = None
         for w in self.contenido.winfo_children():
             w.destroy()
 
@@ -305,51 +338,6 @@ class PanelAdmin(tk.Frame):
             tk.Label(fc, text="No hay cumpleaños este mes.",
                      fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w")
 
-        # ── Mini monitor — último acceso del monitor externo ──────────────────
-        fm = tk.Frame(self.contenido, bg=T("CARD_BG"), padx=20, pady=12)
-        fm.pack(fill="x", padx=24, pady=(8, 16))
-        tk.Label(fm, text="🖥  Último acceso (monitor externo)",
-                 font=FONT_BOLD, fg=T("ACENTO"), bg=T("CARD_BG")).pack(anchor="w")
-        self.lbl_ua_estado = tk.Label(fm, text="— Sin actividad —",
-                                      font=("Segoe UI", 12, "bold"),
-                                      fg=T("TEXT_DIM"), bg=T("CARD_BG"))
-        self.lbl_ua_estado.pack(anchor="w", pady=(4, 0))
-        self.lbl_ua_nombre = tk.Label(fm, text="",
-                                      font=FONT_LABEL, fg=T("TEXT"), bg=T("CARD_BG"))
-        self.lbl_ua_nombre.pack(anchor="w")
-        self.lbl_ua_hace   = tk.Label(fm, text="",
-                                      font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("CARD_BG"))
-        self.lbl_ua_hace.pack(anchor="w")
-
-        self._poll_id = None
-        self._poll_acceso()
-
-    def _poll_acceso(self):
-        import time as _t
-        tipo = ultimo_acceso.get("tipo")
-        ts   = ultimo_acceso.get("ts", 0)
-        if tipo and ts:
-            hace = int(_t.time() - ts)
-            if hace < 60:
-                hace_txt = f"hace {hace}s"
-            elif hace < 3600:
-                hace_txt = f"hace {hace // 60}min"
-            else:
-                hace_txt = f"hace {hace // 3600}h"
-            if tipo == "ok":
-                estado_txt, color = "✅  Acceso habilitado", OK
-            elif tipo == "vencida":
-                estado_txt, color = "❌  Cuota vencida", ERROR
-            else:
-                estado_txt, color = "⚠️  DNI no registrado", WARN
-            nombre = ultimo_acceso.get("nombre") or ultimo_acceso.get("dni", "")
-            try:
-                self.lbl_ua_estado.config(text=estado_txt, fg=color)
-                self.lbl_ua_nombre.config(text=nombre)
-                self.lbl_ua_hace.config(text=hace_txt)
-            except Exception:
-                return
-        self._poll_id = self.contenido.after(2000, self._poll_acceso)
 
     # ══════════════════════════════════════════════════════════════════════════
     # SOCIOS
@@ -496,14 +484,34 @@ class PanelAdmin(tk.Frame):
             else:
                 ok, msg = db.alta_socio(dni, nombre, apellido, celular, plan_id, fn, mail, obs)
                 if not ok:
-                    messagebox.showerror("Error", msg, parent=win)
-                    return
-                if var_pago_ya.get():
-                    nuevo = db.get_socio_por_dni(dni)
-                    if nuevo:
-                        vence = db.registrar_pago(nuevo["id"], var_fecha_pago.get() or None)
-                        msg += f"\nPago registrado — vence: {vence}"
-                messagebox.showinfo("Guardado", msg, parent=win)
+                    inactivo = db.get_socio_inactivo_por_dni(dni)
+                    if inactivo:
+                        resp = messagebox.askyesno(
+                            "Socio dado de baja",
+                            f"{apellido}, {nombre} ya existe pero está dado de baja.\n"
+                            "¿Querés reactivarlo con los datos ingresados?",
+                            parent=win)
+                        if not resp:
+                            return
+                        db.reactivar_socio(inactivo["id"], nombre, apellido, celular,
+                                           plan_id, fn, mail, obs)
+                        if var_pago_ya.get():
+                            vence = db.registrar_pago(inactivo["id"], var_fecha_pago.get() or None)
+                            messagebox.showinfo("Reactivado",
+                                f"Socio reactivado correctamente.\nVence: {vence}", parent=win)
+                        else:
+                            messagebox.showinfo("Reactivado",
+                                "Socio reactivado correctamente.", parent=win)
+                    else:
+                        messagebox.showerror("Error", msg, parent=win)
+                        return
+                else:
+                    if var_pago_ya.get():
+                        nuevo = db.get_socio_por_dni(dni)
+                        if nuevo:
+                            vence = db.registrar_pago(nuevo["id"], var_fecha_pago.get() or None)
+                            msg += f"\nPago registrado — vence: {vence}"
+                    messagebox.showinfo("Guardado", msg, parent=win)
             win.destroy()
             self._actualizar_lista()
 
