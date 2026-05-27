@@ -9,6 +9,12 @@ import sys
 import os
 from datetime import date, datetime
 
+try:
+    from PIL import Image, ImageTk
+    PIL_OK = True
+except ImportError:
+    PIL_OK = False
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import db.database as db
 from core.puerta import puerta, listar_dispositivos_hid, guardar_config
@@ -104,17 +110,36 @@ class PanelAdmin(tk.Frame):
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        # Logo
-        self.lbl_gym = tk.Label(
-            self.sidebar, text="REYHAN", font=("Georgia", 22, "bold"),
-            fg=T("ACENTO"), bg=T("SIDEBAR_BG")
-        )
-        self.lbl_gym.pack(pady=(24, 2))
-        self.lbl_sub = tk.Label(
-            self.sidebar, text="Centro de Entrenamiento",
-            font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG")
-        )
-        self.lbl_sub.pack(pady=(0, 12))
+        # Logo sidebar
+        icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
+        logo_path = os.path.join(icon_dir, "logo_sidebar.png")
+        self._sidebar_img = None
+        if PIL_OK and os.path.exists(logo_path):
+            try:
+                pil_img = Image.open(logo_path).convert("RGBA")
+                ratio = min(172 / pil_img.width, 72 / pil_img.height)
+                nw, nh = int(pil_img.width * ratio), int(pil_img.height * ratio)
+                pil_img = pil_img.resize((nw, nh), Image.LANCZOS)
+                self._sidebar_img = ImageTk.PhotoImage(pil_img)
+            except Exception:
+                self._sidebar_img = None
+
+        if self._sidebar_img:
+            self.lbl_gym = tk.Label(self.sidebar, image=self._sidebar_img,
+                                    bg=T("SIDEBAR_BG"))
+            self.lbl_gym.pack(pady=(20, 12))
+            self.lbl_sub = None
+        else:
+            self.lbl_gym = tk.Label(
+                self.sidebar, text="REYHAN", font=("Georgia", 22, "bold"),
+                fg=T("ACENTO"), bg=T("SIDEBAR_BG")
+            )
+            self.lbl_gym.pack(pady=(24, 2))
+            self.lbl_sub = tk.Label(
+                self.sidebar, text="Centro de Entrenamiento",
+                font=FONT_SMALL, fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG")
+            )
+            self.lbl_sub.pack(pady=(0, 12))
 
         self.sep_top = tk.Frame(self.sidebar, bg=T("SEP"), height=1)
         self.sep_top.pack(fill="x", padx=16, pady=(0, 8))
@@ -223,8 +248,9 @@ class PanelAdmin(tk.Frame):
         self.header_bar.configure(bg=T("CARD_BG"))
         self.lbl_hdr_ua.configure(bg=T("CARD_BG"))
         self.contenido.configure(bg=T("BG"))
-        self.lbl_gym.configure(fg=T("ACENTO"), bg=T("SIDEBAR_BG"))
-        self.lbl_sub.configure(fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG"))
+        self.lbl_gym.configure(bg=T("SIDEBAR_BG"))
+        if self.lbl_sub:
+            self.lbl_sub.configure(fg=T("TEXT_DIM"), bg=T("SIDEBAR_BG"))
         self.sep_top.configure(bg=T("SEP"))
         self.sep_bot.configure(bg=T("SEP"))
         icono = "🌙  Modo Oscuro" if _tema["actual"] == "claro" else "☀  Modo Claro"
