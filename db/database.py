@@ -128,6 +128,7 @@ def get_socio_inactivo_por_dni(dni):
 def reactivar_socio(socio_id, nombre, apellido, celular, plan_id,
                     fecha_nacimiento=None, email=None, observaciones=None):
     conn = get_conn()
+    conn.execute("DELETE FROM pagos WHERE socio_id = ?", (socio_id,))
     conn.execute("""
         UPDATE socios SET activo=1, nombre=?, apellido=?, celular=?, plan_id=?,
             fecha_nacimiento=?, email=?, observaciones=?
