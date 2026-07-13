@@ -1083,13 +1083,18 @@ class PanelAdmin(tk.Frame):
         labels = [label(d) for d in dispositivos]
         self.combo_device.configure(values=labels)
 
-        # Preseleccionar el dispositivo ya configurado si sigue conectado
-        saved = puerta.cfg.get("device_path", "")
+        # Preseleccionar por VID+PID (estable) o por path como fallback
+        saved_vid  = puerta.cfg.get("vid", 0)
+        saved_pid  = puerta.cfg.get("pid", 0)
+        saved_path = puerta.cfg.get("device_path", "")
         for i, d in enumerate(dispositivos):
+            match_vp = saved_vid and saved_pid and \
+                       d.get("vendor_id") == saved_vid and d.get("product_id") == saved_pid
             p = d.get("path", b"")
             if isinstance(p, bytes):
                 p = p.decode("utf-8", errors="replace")
-            if p == saved:
+            match_path = p == saved_path
+            if match_vp or match_path:
                 self.combo_device.current(i)
                 self.lbl_test.config(
                     text=f"{len(dispositivos)} dispositivo(s) encontrado(s) — dispositivo guardado preseleccionado.",
@@ -1104,19 +1109,26 @@ class PanelAdmin(tk.Frame):
     def _guardar_config_puerta(self):
         idx = self.combo_device.current()
         if self._hid_devices and 0 <= idx < len(self._hid_devices):
-            raw = self._hid_devices[idx].get("path", b"")
+            dev = self._hid_devices[idx]
+            raw = dev.get("path", b"")
             device_path = raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw
+            vid = dev.get("vendor_id", 0)
+            pid = dev.get("product_id", 0)
         else:
-            # No se detectó todavía: conservar el path guardado
             device_path = puerta.cfg.get("device_path", "")
+            vid = puerta.cfg.get("vid", 0)
+            pid = puerta.cfg.get("pid", 0)
 
         nueva_cfg = {
-            "device_path":    device_path,
+            "vid":             vid,
+            "pid":             pid,
+            "device_path":     device_path,
             "tiempo_apertura": self.var_tiempo.get(),
             "simulacion":      self.var_sim.get(),
         }
         puerta.actualizar_config(nueva_cfg)
-        messagebox.showinfo("Guardado", "Configuración de puerta guardada.")
+        messagebox.showinfo("Guardado",
+            f"Configuración guardada.\nDispositivo: VID:{vid:#06x} PID:{pid:#06x}")
 
     def _test_conexion_puerta(self):
         # Aplicar config actual antes de testear

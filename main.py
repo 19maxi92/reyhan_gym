@@ -10,6 +10,7 @@ Al iniciar:
 """
 
 import tkinter as tk
+import threading
 import sys
 import os
 
@@ -20,6 +21,7 @@ sys.path.insert(0, BASE_DIR)
 import db.database as db
 from ui.panel_admin import PanelAdmin
 from ui.ventana_acceso import VentanaAcceso
+from core.puerta import puerta
 
 
 def detectar_monitores(root):
@@ -78,6 +80,9 @@ def main():
 
     # ── Backup automático al inicio ───────────────────────────────────────────
     db.hacer_backup()
+
+    # ── Asegurar relé cerrado al iniciar ──────────────────────────────────────
+    threading.Thread(target=puerta.cerrar, daemon=True).start()
 
     # ── Ventana raíz (oculta, solo para Tkinter) ──────────────────────────────
     root = tk.Tk()

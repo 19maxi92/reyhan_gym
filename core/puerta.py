@@ -29,9 +29,11 @@ CMD_ABRIR  = bytes([0x00, 0xFF, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 CMD_CERRAR = bytes([0x00, 0xFD, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
 
 CONFIG_DEFAULT = {
-    "device_path":    "",
+    "vid":             0,
+    "pid":             0,
+    "device_path":     "",
     "tiempo_apertura": TIEMPO_APERTURA,
-    "simulacion":     False,
+    "simulacion":      False,
 }
 
 
@@ -83,6 +85,25 @@ class ControlPuerta:
     def _conectar(self):
         if not HID_AVAILABLE or self.cfg.get("simulacion"):
             return None
+        # Intenta primero por VID+PID (estable entre reboots)
+        vid = self.cfg.get("vid", 0)
+        pid = self.cfg.get("pid", 0)
+        if vid and pid:
+            try:
+                d = hid.device()
+                d.open(vid, pid)
+                return d
+            except Exception:
+                pass
+            # Si open() falla, busca en la enumeración y prueba cada path
+            for dev in hid.enumerate(vid, pid):
+                try:
+                    d = hid.device()
+                    d.open_path(dev["path"])
+                    return d
+                except Exception:
+                    continue
+        # Fallback al path guardado
         path = self._path_bytes()
         if not path:
             print("[PUERTA] No hay dispositivo configurado.")
@@ -95,8 +116,25 @@ class ControlPuerta:
             print(f"[PUERTA] Error de conexión: {e}")
             return None
 
+    def cerrar(self):
+        """Fuerza el cierre del relé — usado al iniciar y como seguridad."""
+        if not HID_AVAILABLE or self.cfg.get("simulacion"):
+            return
+        conn = self._conectar()
+        if not conn:
+            return
+        try:
+            conn.send_feature_report(CMD_CERRAR)
+        except Exception as e:
+            print(f"[PUERTA] Error al cerrar: {e}")
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
     def abrir(self, segundos=None):
-        """Abre la puerta y la cierra automáticamente."""
+        """Abre la puerta y la cierra automáticamente. Reintenta el cierre si falla."""
         t = segundos or self.cfg.get("tiempo_apertura", TIEMPO_APERTURA)
 
         def _ciclo():
@@ -112,11 +150,21 @@ class ControlPuerta:
                 try:
                     conn.send_feature_report(CMD_ABRIR)
                     time.sleep(t)
-                    conn.send_feature_report(CMD_CERRAR)
+                    # Reintenta el cierre hasta 3 veces para evitar que quede abierta
+                    for intento in range(3):
+                        try:
+                            conn.send_feature_report(CMD_CERRAR)
+                            break
+                        except Exception:
+                            if intento < 2:
+                                time.sleep(0.3)
                 except Exception as e:
                     print(f"[PUERTA] Error en ciclo: {e}")
                 finally:
-                    conn.close()
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
 
         threading.Thread(target=_ciclo, daemon=True).start()
 
