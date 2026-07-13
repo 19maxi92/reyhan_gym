@@ -935,95 +935,125 @@ class PanelAdmin(tk.Frame):
         self._titulo("🚪 Configuración de Puerta")
 
         cfg = puerta.cfg
-        self._hid_devices = []  # se llena al presionar Detectar
+        self._hid_devices = []
 
-        # ── Estado actual ─────────────────────────────────────────────────────
-        fc = tk.Frame(self.contenido, bg=T("CARD_BG"), padx=20, pady=16)
-        fc.pack(fill="x", padx=24, pady=8)
-        tk.Label(fc, text="Estado del servicio de acceso",
+        # ── Estado del sistema ────────────────────────────────────────────────
+        fc = tk.Frame(self.contenido, bg=T("CARD_BG"), padx=20, pady=14)
+        fc.pack(fill="x", padx=24, pady=(4, 8))
+        tk.Label(fc, text="Estado del sistema",
                  font=FONT_BOLD, fg=T("ACENTO"), bg=T("CARD_BG")).pack(anchor="w")
         self.lbl_estado_puerta = tk.Label(
-            fc, text="● Activo — escuchando DNI",
-            font=FONT_LABEL, fg=OK, bg=T("CARD_BG")
-        )
-        self.lbl_estado_puerta.pack(anchor="w", pady=4)
+            fc, text="● Sistema activo — esperando DNI de socios",
+            font=FONT_LABEL, fg=OK, bg=T("CARD_BG"))
+        self.lbl_estado_puerta.pack(anchor="w", pady=(4, 0))
+        tk.Label(fc,
+                 text="El sistema lee el DNI del teclado numérico y abre la puerta automáticamente si el socio está al día.",
+                 fg=T("TEXT_DIM"), bg=T("CARD_BG"), font=FONT_SMALL).pack(anchor="w", pady=(2, 0))
 
-        # ── Selección de dispositivo HID ──────────────────────────────────────
-        tk.Label(self.contenido, text="Dispositivo Relé USB HID",
-                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(12, 4))
+        # ── PASO 1 ────────────────────────────────────────────────────────────
+        tk.Label(self.contenido, text="PASO 1  —  Conectar el USB Relay (la llave de la puerta)",
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(14, 2))
+        tk.Label(self.contenido,
+                 text="El USB Relay es el dispositivo que conectás a la PC y que abre físicamente la puerta.\n"
+                      "Enchufalo al puerto USB y hacé click en «Buscar USB Relay».",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24)
 
         f1 = tk.Frame(self.contenido, bg=T("BG"))
-        f1.pack(fill="x", padx=24, pady=4)
-        boton(f1, "🔍 Detectar dispositivos", self._detectar_hid,
-              color="#3a7bd5", fg="white").pack(side="left", padx=(0, 8))
+        f1.pack(fill="x", padx=24, pady=6)
+        boton(f1, "🔍 Buscar USB Relay", self._detectar_hid,
+              color="#3a7bd5", fg="white").pack(side="left", padx=(0, 10))
 
-        saved = cfg.get("device_path", "")
-        initial = "✅ Dispositivo configurado — pulsá Detectar para ver detalles" if saved \
-                  else "— Pulsá Detectar para buscar el relé —"
+        saved_vid = cfg.get("vid", 0)
+        initial = (f"✅ Relay guardado: VID:{saved_vid:#06x} — hacé click en Buscar para confirmar"
+                   if saved_vid else "— Hacé click en «Buscar USB Relay» para ver los dispositivos —")
         self.var_device = tk.StringVar(value=initial)
         self.combo_device = ttk.Combobox(f1, textvariable=self.var_device,
                                          state="readonly", width=52)
         self.combo_device.pack(side="left")
 
-        # ── Tiempo de apertura ────────────────────────────────────────────────
+        tk.Label(self.contenido,
+                 text="Una vez que aparezca la lista, seleccioná el que dice «Relay» o el que tiene\n"
+                      "el VID/PID del dispositivo que te indicaron. Si no sabés cuál es, probá cada uno con «Probar apertura».",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24, pady=(2, 0))
+
+        # ── PASO 2 ────────────────────────────────────────────────────────────
+        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(fill="x", padx=24, pady=10)
+        tk.Label(self.contenido, text="PASO 2  —  Cuántos segundos queda abierta la puerta",
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 2))
+        tk.Label(self.contenido,
+                 text="Es el tiempo que la puerta permanece desbloqueada después de que el socio pone el DNI.\n"
+                      "Recomendado: 3 segundos. Aumentá si la puerta cierra muy rápido antes de que pase.",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24)
+
         f4 = tk.Frame(self.contenido, bg=T("BG"))
-        f4.pack(fill="x", padx=24, pady=4)
-        tk.Label(f4, text="Tiempo apertura (seg):", fg=T("TEXT"), bg=T("BG"),
-                 font=FONT_SMALL, width=20, anchor="w").pack(side="left")
+        f4.pack(fill="x", padx=24, pady=6)
+        tk.Label(f4, text="Segundos abierta:", fg=T("TEXT"), bg=T("BG"),
+                 font=FONT_SMALL, anchor="w").pack(side="left", padx=(0, 8))
         self.var_tiempo = tk.IntVar(value=cfg.get("tiempo_apertura", 3))
         tk.Spinbox(f4, from_=1, to=10, textvariable=self.var_tiempo,
                    width=4, bg=T("ENTRADA_BG"), fg=T("TEXT"),
                    font=FONT_LABEL, relief="flat",
                    buttonbackground=T("SEP")).pack(side="left")
+        tk.Label(f4, text="  (mínimo 1 — máximo 10)", fg=T("TEXT_DIM"), bg=T("BG"),
+                 font=FONT_SMALL).pack(side="left")
 
-        # ── Modo simulación ───────────────────────────────────────────────────
+        # ── PASO 3 ────────────────────────────────────────────────────────────
+        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(fill="x", padx=24, pady=10)
+        tk.Label(self.contenido, text="PASO 3  —  Guardar y verificar",
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 4))
+
+        fb = tk.Frame(self.contenido, bg=T("BG"))
+        fb.pack(fill="x", padx=24, pady=2)
+        boton(fb, "💾 Guardar configuración", self._guardar_config_puerta
+              ).pack(side="left", padx=(0, 6))
+        boton(fb, "🔌 Verificar conexión", self._test_conexion_puerta,
+              color="#3a7bd5", fg="white").pack(side="left", padx=(0, 6))
+        boton(fb, "🚪 Probar apertura (2 seg)", self._test_apertura_puerta,
+              color="#555", fg="white").pack(side="left")
+
+        tk.Label(self.contenido,
+                 text="Guardá primero, luego verificá la conexión. Si dice OK, hacé «Probar apertura» para confirmar que la puerta se abre.",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24, pady=(4, 0))
+
+        self.lbl_test = tk.Label(self.contenido, text="", font=FONT_BOLD, bg=T("BG"))
+        self.lbl_test.pack(anchor="w", padx=24, pady=(6, 0))
+
+        # ── Modo prueba ───────────────────────────────────────────────────────
+        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(fill="x", padx=24, pady=10)
+        tk.Label(self.contenido, text="Modo prueba (sin hardware)",
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 2))
+        tk.Label(self.contenido,
+                 text="Activalo si querés probar el sistema SIN que la puerta se abra físicamente.\n"
+                      "Útil para capacitar al personal o probar la pantalla. Desactivarlo cuando el sistema esté en uso real.",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24)
         f5 = tk.Frame(self.contenido, bg=T("BG"))
         f5.pack(fill="x", padx=24, pady=4)
         self.var_sim = tk.BooleanVar(value=cfg.get("simulacion", False))
-        tk.Checkbutton(f5, text="Modo simulación (sin hardware real)",
+        tk.Checkbutton(f5, text="Activar modo prueba — la puerta NO se abre físicamente",
                        variable=self.var_sim,
                        bg=T("BG"), fg=T("TEXT"), selectcolor=T("ENTRADA_BG"),
                        activebackground=T("BG"), activeforeground=T("TEXT"),
                        font=FONT_SMALL).pack(side="left")
 
-        # ── Botones de acción ─────────────────────────────────────────────────
-        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(
-            fill="x", padx=24, pady=12)
-
-        fb = tk.Frame(self.contenido, bg=T("BG"))
-        fb.pack(fill="x", padx=24, pady=4)
-        boton(fb, "💾 Guardar configuración", self._guardar_config_puerta
-              ).pack(side="left", padx=4)
-        boton(fb, "🔌 Test de conexión", self._test_conexion_puerta,
-              color="#3a7bd5", fg="white").pack(side="left", padx=4)
-        boton(fb, "🚪 Test apertura (2 seg)", self._test_apertura_puerta,
-              color="#555", fg="white").pack(side="left", padx=4)
-
-        self.lbl_test = tk.Label(self.contenido, text="",
-                                  font=FONT_BOLD, bg=T("BG"))
-        self.lbl_test.pack(anchor="w", padx=24, pady=(8, 0))
-
-        # ── Simulación de carteles ─────────────────────────────────────────────
-        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(
-            fill="x", padx=24, pady=10)
-        tk.Label(self.contenido, text="Simulación de carteles (sin DNI real)",
-                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 6))
+        # ── Probar carteles ───────────────────────────────────────────────────
+        tk.Frame(self.contenido, bg=T("SEP"), height=1).pack(fill="x", padx=24, pady=10)
+        tk.Label(self.contenido, text="Probar pantalla del socio",
+                 font=FONT_BOLD, fg=T("TEXT"), bg=T("BG")).pack(anchor="w", padx=24, pady=(0, 2))
+        tk.Label(self.contenido,
+                 text="Muestra en la pantalla exterior cómo ve el socio cada situación, sin necesidad de ingresar un DNI real.",
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24)
 
         fb2 = tk.Frame(self.contenido, bg=T("BG"))
-        fb2.pack(fill="x", padx=24, pady=4)
-        boton(fb2, "✅ Simular acceso OK",
+        fb2.pack(fill="x", padx=24, pady=6)
+        boton(fb2, "✅ Socio al día — acceso OK",
               lambda: self._simular_cartel("ok"),
-              color=OK, fg="white").pack(side="left", padx=4)
-        boton(fb2, "❌ Simular cuota vencida",
+              color=OK, fg="white").pack(side="left", padx=(0, 6))
+        boton(fb2, "❌ Socio con cuota vencida",
               lambda: self._simular_cartel("vencida"),
-              color=ERROR, fg="white").pack(side="left", padx=4)
-        boton(fb2, "⚠️ Simular no encontrado",
+              color=ERROR, fg="white").pack(side="left", padx=(0, 6))
+        boton(fb2, "⚠️ DNI no registrado en el sistema",
               lambda: self._simular_cartel("no_encontrado"),
-              color=WARN, fg="white").pack(side="left", padx=4)
-
-        tk.Label(self.contenido,
-                 text="Los carteles se muestran en el monitor externo igual que cuando llega un socio.",
-                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=24, pady=(4, 0))
+              color=WARN, fg="white").pack(side="left")
 
     def _simular_cartel(self, tipo):
         """Dispara el cartel en la ventana de acceso como si llegara un socio real."""
