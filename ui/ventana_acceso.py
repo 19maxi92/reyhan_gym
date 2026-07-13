@@ -70,14 +70,15 @@ class VentanaAcceso(tk.Toplevel):
 
         # Logo / nombre gimnasio
         icon_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "icon")
-        logo_path = os.path.join(icon_dir, "logo_dark.png")
-        if not os.path.exists(logo_path):
-            logo_path = os.path.join(icon_dir, "reyhan_icon.png")
+        for _name in ("logo_dark.jpeg", "logo_dark.jpg", "logo_dark.png", "reyhan_icon.png"):
+            logo_path = os.path.join(icon_dir, _name)
+            if os.path.exists(logo_path):
+                break
         self._logo_img = None
         if PIL_OK and os.path.exists(logo_path):
             try:
                 pil_img = Image.open(logo_path).convert("RGBA")
-                max_w, max_h = int(w * 0.45), int(h * 0.18)
+                max_w, max_h = int(w * 0.65), int(h * 0.28)
                 ratio = min(max_w / pil_img.width, max_h / pil_img.height)
                 nw, nh = int(pil_img.width * ratio), int(pil_img.height * ratio)
                 pil_img = pil_img.resize((nw, nh), Image.LANCZOS)
@@ -92,20 +93,20 @@ class VentanaAcceso(tk.Toplevel):
                 self, text="REYHAN", font=("Georgia", 32, "bold"),
                 fg=COLOR_ACENTO, bg=COLOR_FONDO
             )
-        self.lbl_gym.place(relx=0.5, rely=0.12, anchor="center")
+        self.lbl_gym.place(relx=0.5, rely=0.15, anchor="center")
 
         self.lbl_sep = tk.Label(
             self, text="─────────────────────",
             fg=COLOR_ACENTO, bg=COLOR_FONDO, font=("Courier", 12)
         )
-        self.lbl_sep.place(relx=0.5, rely=0.17, anchor="center")
+        self.lbl_sep.place(relx=0.5, rely=0.32, anchor="center")
 
         # Instrucción
         self.lbl_instruccion = tk.Label(
             self, text="Ingresá tu DNI",
             font=("Georgia", 20), fg="#aaaaaa", bg=COLOR_FONDO
         )
-        self.lbl_instruccion.place(relx=0.5, rely=0.26, anchor="center")
+        self.lbl_instruccion.place(relx=0.5, rely=0.38, anchor="center")
 
         # Campo DNI
         self.var_dni = tk.StringVar()
@@ -120,13 +121,13 @@ class VentanaAcceso(tk.Toplevel):
             highlightbackground=COLOR_INPUT_BORDE,
             width=12
         )
-        self.entry_dni.place(relx=0.5, rely=0.38, anchor="center",
+        self.entry_dni.place(relx=0.5, rely=0.48, anchor="center",
                              width=480, height=80)
         self.entry_dni.bind("<Key>", self._on_key)
 
         # Área de mensaje (ok / error) — posición relativa más arriba
         self.frame_msg = tk.Frame(self, bg=COLOR_FONDO)
-        self.frame_msg.place(relx=0.5, rely=0.62, anchor="center",
+        self.frame_msg.place(relx=0.5, rely=0.72, anchor="center",
                              width=700, height=220)
 
         self.lbl_icono = tk.Label(
