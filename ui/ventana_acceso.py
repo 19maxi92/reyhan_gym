@@ -10,6 +10,7 @@ import threading
 import time
 import sys
 import os
+from datetime import date, datetime
 
 # Estado compartido: el dashboard lee esto para mostrar el último acceso
 ultimo_acceso = {"tipo": None, "nombre": "", "dni": "", "ts": 0}
@@ -36,6 +37,31 @@ COLOR_INPUT_BG    = "#1a1a1a"
 COLOR_INPUT_BORDE = "#333333"
 
 TIEMPO_MENSAJE = 5500  # ms que se muestra el cartel antes de volver al estado inicial
+DIAS_AVISO     = 5     # con esta cantidad de días o menos, el vencimiento sale en naranja
+
+
+def texto_vencimiento(vence_str, vigente):
+    """
+    Arma el cartel de vencimiento para la pantalla de acceso.
+    Devuelve (texto, color) o ("", None) si no hay fecha.
+    """
+    if not vence_str:
+        return "", None
+    try:
+        vence = datetime.strptime(vence_str, "%Y-%m-%d").date()
+    except ValueError:
+        return "", None
+    fecha = vence.strftime("%d/%m/%Y")
+    if not vigente:
+        return f"Tu cuota venció el {fecha}", COLOR_ERROR
+    dias = (vence - date.today()).days
+    if dias == 0:
+        return f"Tu cuota vence HOY ({fecha})", COLOR_WARN
+    if dias == 1:
+        return f"Tu cuota vence MAÑANA ({fecha})", COLOR_WARN
+    if dias <= DIAS_AVISO:
+        return f"Tu cuota vence el {fecha}  ·  faltan {dias} días", COLOR_WARN
+    return f"Tu cuota vence el {fecha}", COLOR_TEXTO
 
 
 class VentanaAcceso(tk.Toplevel):
@@ -127,8 +153,8 @@ class VentanaAcceso(tk.Toplevel):
 
         # Área de mensaje (ok / error) — posición relativa más arriba
         self.frame_msg = tk.Frame(self, bg=COLOR_FONDO)
-        self.frame_msg.place(relx=0.5, rely=0.72, anchor="center",
-                             width=700, height=220)
+        self.frame_msg.place(relx=0.5, rely=0.74, anchor="center",
+                             width=800, height=290)
 
         self.lbl_icono = tk.Label(
             self.frame_msg, text="", font=("Segoe UI Emoji", 52),
@@ -150,6 +176,14 @@ class VentanaAcceso(tk.Toplevel):
         )
         self.lbl_submsg.pack(pady=(4, 0))
 
+        # Fecha de vencimiento de la cuota (para que el socio sepa cuándo pagar)
+        self.lbl_vence = tk.Label(
+            self.frame_msg, text="",
+            font=("Georgia", 22, "bold"),
+            bg=COLOR_FONDO, wraplength=780, justify="center"
+        )
+        self.lbl_vence.pack(pady=(12, 0))
+
     # ─── ESTADOS ──────────────────────────────────────────────────────────────
 
     def _estado_espera(self):
@@ -160,6 +194,7 @@ class VentanaAcceso(tk.Toplevel):
         self.lbl_icono.config(text="", fg=COLOR_FONDO)
         self.lbl_msg.config(text="", fg=COLOR_FONDO)
         self.lbl_submsg.config(text="", fg=COLOR_FONDO)
+        self.lbl_vence.config(text="", fg=COLOR_FONDO)
         self.entry_dni.config(
             fg=COLOR_ACENTO,
             highlightbackground=COLOR_INPUT_BORDE
@@ -173,6 +208,7 @@ class VentanaAcceso(tk.Toplevel):
         self.lbl_icono.config(text="✅", fg=COLOR_OK)
         self.lbl_msg.config(text=nombre, fg=COLOR_OK)
         self.lbl_submsg.config(text="Acceso habilitado", fg="#aaaaaa")
+        self._mostrar_vencimiento(socio, vigente=True)
         self.entry_dni.config(fg=COLOR_OK, highlightbackground=COLOR_OK)
         threading.Thread(target=puerta.abrir, daemon=True).start()
         self._volver_en(TIEMPO_MENSAJE)
@@ -187,6 +223,7 @@ class VentanaAcceso(tk.Toplevel):
             text="Tu cuota está vencida.\nAcercate a recepción para renovar.",
             fg="#aaaaaa"
         )
+        self._mostrar_vencimiento(socio, vigente=False)
         self.entry_dni.config(fg=COLOR_ERROR, highlightbackground=COLOR_ERROR)
         self._volver_en(TIEMPO_MENSAJE)
 
@@ -199,8 +236,13 @@ class VentanaAcceso(tk.Toplevel):
             text="Acercate a recepción para darte de alta.",
             fg="#aaaaaa"
         )
+        self.lbl_vence.config(text="", fg=COLOR_FONDO)
         self.entry_dni.config(fg=COLOR_WARN, highlightbackground=COLOR_WARN)
         self._volver_en(TIEMPO_MENSAJE)
+
+    def _mostrar_vencimiento(self, socio, vigente):
+        texto, color = texto_vencimiento(socio.get("vencimiento"), vigente)
+        self.lbl_vence.config(text=texto, fg=color or COLOR_FONDO)
 
     # ─── INPUT ────────────────────────────────────────────────────────────────
 
