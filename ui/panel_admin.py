@@ -428,13 +428,15 @@ class PanelAdmin(tk.Frame):
         self.var_buscar = tk.StringVar()
         self.var_buscar.trace("w", lambda *a: self._actualizar_lista())
         entrada(bar, textvariable=self.var_buscar, width=36).pack(side="left", ipady=4)
-        tk.Label(bar, text="  🔍 Nombre, DNI, celular...",
+        tk.Label(bar, text="  🔍 Nombre, DNI, celular, nota...",
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(side="left")
         boton(bar, "+ Nuevo Socio", self._form_nuevo_socio).pack(side="right")
         boton(bar, "⬇ Exportar CSV", self._exportar_csv,
               color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="right", padx=4)
+        boton(bar, "📝 Notas", self._editar_nota_seleccionado,
+              color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="right", padx=4)
 
-        cols = ("DNI", "Apellido", "Nombre", "Celular", "Plan", "Estado", "Vence", "Alta")
+        cols = ("DNI", "Apellido", "Nombre", "Celular", "Plan", "Estado", "Vence", "Alta", "📝 Notas")
         ft, self.tree_socios = self._tabla(self.contenido, cols)
         self.tree_socios.column("DNI",      width=85,  anchor="w")
         self.tree_socios.column("Apellido", width=120, anchor="w")
@@ -444,9 +446,12 @@ class PanelAdmin(tk.Frame):
         self.tree_socios.column("Estado",   width=85,  anchor="center")
         self.tree_socios.column("Vence",    width=88,  anchor="center")
         self.tree_socios.column("Alta",     width=88,  anchor="center")
+        self.tree_socios.column("📝 Notas", width=220, anchor="w")
+        self.tree_socios.tag_configure("con_nota", foreground=WARN)
         ft.pack(fill="both", expand=True, padx=24, pady=8)
-        self.tree_socios.bind("<Double-1>", lambda e: self._abrir_socio())
-        tk.Label(self.contenido, text="Doble click para editar",
+        self.tree_socios.bind("<Double-1>", self._on_doble_click_socio)
+        tk.Label(self.contenido,
+                 text="Doble click para editar  ·  Doble click en la columna 📝 Notas (o botón 📝 Notas) para anotar",
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(pady=4)
         self._actualizar_lista()
 
@@ -462,8 +467,91 @@ class PanelAdmin(tk.Frame):
                 s["dni"], s["apellido"], s["nombre"],
                 s["celular"] or "-", s["plan_nombre"] or "-",
                 "✅ Al día" if vigente else "❌ Vencida",
-                vence, s.get("fecha_alta", "-") or "-"
-            ))
+                vence, s.get("fecha_alta", "-") or "-",
+                self._nota_corta(s.get("observaciones"))
+            ), tags=("con_nota",) if s.get("observaciones") else ())
+
+    @staticmethod
+    def _nota_corta(nota):
+        """Nota en una sola línea para la tabla (vacía si no hay)."""
+        if not nota:
+            return ""
+        return "📝 " + " / ".join(l.strip() for l in nota.splitlines() if l.strip())
+
+    def _on_doble_click_socio(self, event):
+        fila = self.tree_socios.identify_row(event.y)
+        if not fila:
+            return
+        self.tree_socios.selection_set(fila)
+        # Columna de notas = la última → abre el editor rápido de notas
+        col = self.tree_socios.identify_column(event.x)
+        if col == f"#{len(self.tree_socios['columns'])}":
+            self._editar_nota(int(fila))
+        else:
+            self._abrir_socio()
+
+    def _editar_nota_seleccionado(self):
+        sel = self.tree_socios.selection()
+        if not sel:
+            messagebox.showinfo("Notas", "Seleccioná un socio de la lista primero.", parent=self)
+            return
+        self._editar_nota(int(sel[0]))
+
+    def _editar_nota(self, socio_id):
+        """Ventanita para anotar cosas cortas del socio (ej: "Debe $2500")."""
+        socio = db.get_socio_por_id(socio_id)
+        if not socio:
+            return
+        win = tk.Toplevel(self)
+        win.title(f"Notas — {socio['apellido']}, {socio['nombre']}")
+        win.configure(bg=T("BG"))
+        win.resizable(False, False)
+        win.grab_set()
+
+        tk.Label(win, text=f"📝 {socio['apellido']}, {socio['nombre']}",
+                 font=FONT_BOLD, fg=T("ACENTO"), bg=T("BG")).pack(anchor="w", padx=16, pady=(14, 2))
+        tk.Label(win, text='Anotaciones cortas, ej: "Debe $2500", "Se le deben $5000"',
+                 fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=16)
+
+        txt = tk.Text(win, width=44, height=4, wrap="word",
+                      bg=T("ENTRADA_BG"), fg=T("TEXT"), insertbackground=T("TEXT"),
+                      selectbackground=T("ACENTO"), selectforeground="#ffffff",
+                      relief="flat", font=FONT_LABEL, highlightthickness=1,
+                      highlightbackground=T("SEP"), highlightcolor=T("ACENTO"))
+        txt.pack(padx=16, pady=8)
+        txt.insert("1.0", socio.get("observaciones") or "")
+        txt.focus_set()
+
+        def guardar(event=None):
+            db.set_observaciones(socio_id, txt.get("1.0", "end"))
+            win.destroy()
+            self._refrescar_listas()
+            return "break"
+
+        def borrar():
+            if messagebox.askyesno("Borrar nota", "¿Borrar la nota de este socio?", parent=win):
+                db.set_observaciones(socio_id, "")
+                win.destroy()
+                self._refrescar_listas()
+
+        txt.bind("<Control-Return>", guardar)
+        fb = tk.Frame(win, bg=T("BG"))
+        fb.pack(fill="x", padx=16, pady=(0, 14))
+        boton(fb, "💾 Guardar", guardar).pack(side="left")
+        if socio.get("observaciones"):
+            boton(fb, "🗑 Borrar nota", borrar, color=ERROR, fg="white").pack(side="left", padx=6)
+        boton(fb, "Cancelar", win.destroy,
+              color=T("BTN_CANCEL"), fg=T("BTN_CANCEL_FG")).pack(side="right")
+
+    def _refrescar_listas(self):
+        """Refresca la tabla visible (Socios o Pagos) después de editar una nota."""
+        for tree, refrescar in (("tree_socios", self._actualizar_lista),
+                                ("tree_pagos",  self._actualizar_lista_pagos)):
+            try:
+                if hasattr(self, tree) and getattr(self, tree).winfo_exists():
+                    refrescar()
+            except tk.TclError:
+                pass
 
     def _abrir_socio(self):
         sel = self.tree_socios.selection()
@@ -508,7 +596,7 @@ class PanelAdmin(tk.Frame):
         fila("Celular",       "celular",          socio["celular"]                  if socio else "", True)
         fila("Fecha Nac.",    "fecha_nacimiento", socio.get("fecha_nacimiento", "") if socio else "")
         fila("Email",         "email",            socio.get("email", "")            if socio else "")
-        fila("Observaciones", "observaciones",    socio.get("observaciones", "")    if socio else "")
+        fila("Notas",         "observaciones",    socio.get("observaciones", "")    if socio else "")
 
         fp = tk.Frame(win, bg=T("BG"))
         fp.pack(fill="x", padx=20, pady=3)
@@ -694,8 +782,10 @@ class PanelAdmin(tk.Frame):
         self.var_buscar_pago.trace("w", lambda *a: self._actualizar_lista_pagos())
         entrada(bar, textvariable=self.var_buscar_pago, width=36).pack(side="left", ipady=4)
 
-        cols = ("DNI", "Apellido", "Nombre", "Último pago", "Vence", "Estado")
+        cols = ("DNI", "Apellido", "Nombre", "Último pago", "Vence", "Estado", "📝 Notas")
         ft, self.tree_pagos = self._tabla(self.contenido, cols)
+        self.tree_pagos.column("📝 Notas", width=220, anchor="w")
+        self.tree_pagos.tag_configure("con_nota", foreground=WARN)
         ft.pack(fill="both", expand=True, padx=24, pady=8)
         self.tree_pagos.bind("<Double-1>", lambda e: self._registrar_pago_seleccionado())
         tk.Label(self.contenido, text="Doble click para registrar pago",
@@ -714,8 +804,9 @@ class PanelAdmin(tk.Frame):
                 s["dni"], s["apellido"], s["nombre"],
                 ultimo["fecha_pago"]        if ultimo else "—",
                 ultimo["fecha_vencimiento"] if ultimo else "—",
-                "✅ Al día" if vigente else "❌ Vencida"
-            ))
+                "✅ Al día" if vigente else "❌ Vencida",
+                self._nota_corta(s.get("observaciones"))
+            ), tags=("con_nota",) if s.get("observaciones") else ())
 
     def _registrar_pago_seleccionado(self):
         sel = self.tree_pagos.selection()
@@ -735,6 +826,9 @@ class PanelAdmin(tk.Frame):
                  font=FONT_TITULO, fg=T("ACENTO"), bg=T("BG")).pack(pady=(16, 4), padx=20)
         tk.Label(win, text=f"DNI: {socio['dni']}  |  Plan: {socio['plan_nombre'] or '-'}",
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(pady=(0, 10))
+        if socio.get("observaciones"):
+            tk.Label(win, text=f"📝 {socio['observaciones']}", fg=WARN, bg=T("BG"),
+                     font=FONT_BOLD, wraplength=420, justify="left").pack(padx=20, pady=(0, 8))
 
         f1 = tk.Frame(win, bg=T("BG"))
         f1.pack(fill="x", padx=20, pady=4)
@@ -1089,10 +1183,13 @@ class PanelAdmin(tk.Frame):
                 parent=self)
             return
 
+        from datetime import timedelta
         socio_demo = {"nombre": "Demo", "apellido": "Test"}
         if tipo == "ok":
+            socio_demo["vencimiento"] = (date.today() + timedelta(days=20)).strftime("%Y-%m-%d")
             ventana._estado_ok(socio_demo)
         elif tipo == "vencida":
+            socio_demo["vencimiento"] = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d")
             ventana._estado_vencida(socio_demo)
         else:
             ventana._estado_no_encontrado()

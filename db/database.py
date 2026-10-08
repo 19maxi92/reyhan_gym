@@ -152,6 +152,15 @@ def editar_socio(socio_id, nombre, apellido, celular, plan_id,
     conn.close()
 
 
+def set_observaciones(socio_id, texto):
+    """Guarda la nota rápida del socio (ej: "Debe $2500"). Texto vacío = sin nota."""
+    texto = (texto or "").strip() or None
+    conn = get_conn()
+    conn.execute("UPDATE socios SET observaciones=? WHERE id=?", (texto, socio_id))
+    conn.commit()
+    conn.close()
+
+
 def buscar_socios(texto):
     conn = get_conn()
     q = f"%{texto}%"
@@ -161,10 +170,11 @@ def buscar_socios(texto):
         LEFT JOIN planes p ON s.plan_id = p.id
         WHERE s.activo = 1 AND (
             s.dni LIKE ? OR s.nombre LIKE ? OR
-            s.apellido LIKE ? OR s.celular LIKE ?
+            s.apellido LIKE ? OR s.celular LIKE ? OR
+            s.observaciones LIKE ?
         )
         ORDER BY s.apellido, s.nombre
-    """, (q, q, q, q)).fetchall()
+    """, (q, q, q, q, q)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -195,30 +205,33 @@ def get_socio_por_id(socio_id):
 
 # ─── CUOTA / ACCESO ────────────────────────────────────────────────────────────
 
-def cuota_vigente(socio_id):
-    """Devuelve True si el socio tiene cuota vigente hoy."""
-    hoy = date.today().strftime("%Y-%m-%d")
+def get_ultimo_vencimiento(socio_id):
+    """Fecha de vencimiento más lejana del socio ('AAAA-MM-DD') o None si nunca pagó."""
     conn = get_conn()
     row = conn.execute("""
-        SELECT fecha_vencimiento FROM pagos
-        WHERE socio_id = ?
-        ORDER BY fecha_vencimiento DESC
-        LIMIT 1
+        SELECT MAX(fecha_vencimiento) AS v FROM pagos WHERE socio_id = ?
     """, (socio_id,)).fetchone()
     conn.close()
-    if not row:
-        return False
-    return row["fecha_vencimiento"] >= hoy
+    return row["v"] if row else None
+
+
+def cuota_vigente(socio_id):
+    """Devuelve True si el socio tiene cuota vigente hoy."""
+    vence = get_ultimo_vencimiento(socio_id)
+    return bool(vence) and vence >= date.today().strftime("%Y-%m-%d")
 
 
 def verificar_acceso(dni):
     """
     Retorna: 'ok', 'vencida', 'no_encontrado'
+    El socio devuelto trae además "vencimiento" ('AAAA-MM-DD' o None)
+    para mostrarlo en la pantalla de acceso.
     """
     socio = get_socio_por_dni(dni)
     if not socio:
         return "no_encontrado", None
-    if cuota_vigente(socio["id"]):
+    socio["vencimiento"] = get_ultimo_vencimiento(socio["id"])
+    if socio["vencimiento"] and socio["vencimiento"] >= date.today().strftime("%Y-%m-%d"):
         return "ok", socio
     return "vencida", socio
 
