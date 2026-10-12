@@ -64,7 +64,7 @@ Uso interno. Se actualiza con cada cambio relevante (lo más nuevo arriba).
 | `core/puerta.py` | Relé USB **HID** de la puerta magnética (`hidapi`). Config en `config_puerta.json`. |
 | `relay_test.py` | Utilidad suelta para probar el relé. |
 | `build.bat` | Genera el `.exe` con PyInstaller. |
-| `icon/` | Íconos. Logos opcionales: `logo_dark.(jpeg/jpg/png)` para la pantalla DNI. |
+| `icon/` | Íconos. **`logo_dni.png` = logo oficial fijo de la pantalla DNI** (va en el repo y dentro del `.exe`). `logo_sidebar.*` para el panel. |
 
 **Tablas:** `socios` (con `observaciones` = notas rápidas), `pagos` (`fecha_vencimiento`
 calculada por mes exacto), `planes`.
@@ -96,6 +96,19 @@ calculada por mes exacto), `planes`.
 ---
 
 ## Historial de cambios
+
+### 2026-10-12 — Logo oficial fijo en la pantalla del DNI
+rama `claude/youthful-mendel-ngjxmr`
+- **Pedido de Maxi:** dejar fija la imagen del logo redondo (REYHAN, círculo naranja, fondo negro).
+- Guardado como `icon/logo_dni.png`, **primero en la lista** de `ventana_acceso.py`: le gana a
+  cualquier `logo_dark.*` viejo que haya quedado en la carpeta de quien arma el `.exe`.
+- Se le pasó el negro a transparente ("color to alpha") y se recortó: la imagen original es
+  negro puro (#000) y la pantalla es #0d0d0d, se veía un cuadrado alrededor del círculo.
+- Ojo: el `.exe` es `--onefile`, los logos van **adentro**; poner un archivo suelto en la
+  notebook no cambia nada, hay que rearmar. La imagen original es chica (286×268) y se agranda
+  un poco en 1080p; si aparece una versión más grande, reemplazar `logo_dni.png` (mismo tratamiento).
+- **Archivos:** `icon/logo_dni.png` (nuevo), `ui/ventana_acceso.py`.
+- **Probado** (Xvfb 1920×1080): se ve el círculo sin recuadro, en espera y con cartel de OK.
 
 ### 2026-10-08 — Pantalla DNI muestra el vencimiento + notas rápidas por socio
 rama `claude/youthful-mendel-ngjxmr`
