@@ -22,7 +22,8 @@ Uso interno. Se actualiza con cada cambio relevante (lo más nuevo arriba).
   `ui/ventana_acceso.py` (pantalla del DNI).
 - Ver el historial del archivo: `git log --oneline -5 -- <archivo>`.
 - **La pantalla del DNI la ve cualquiera que entra al gym** (monitor externo).
-  No mostrar ahí datos privados (notas, deudas, celular).
+  No mostrar ahí datos privados (celular, email). Las notas solo salen si están marcadas
+  con 👁 (pedido del cliente, 20/10); las 🔒 son internas.
 
 **3. Base de datos (`gym.db`, SQLite)**
 - La base real vive en la notebook del gym, al lado del `.exe`. **No está en el repo**
@@ -90,12 +91,35 @@ calculada por mes exacto), `planes`.
 - **Panel y pantalla DNI corren en el mismo proceso.** El "último acceso" se comparte por el
   dict `ultimo_acceso` de `ventana_acceso.py`; los botones de simular cartel del panel llaman
   directo a `_estado_ok` / `_estado_vencida` de la ventana.
+- **Nota visible al socio = columna `nota_visible`** (1 = sale en la pantalla del DNI, default).
+  Se agregó con `ALTER TABLE` en `init_db()`: las notas que ya existían quedaron visibles.
 - **Notas del socio = columna `observaciones`.** Es el mismo campo del formulario de
   edición (ahí se llama "Notas"). No crear otra columna para lo mismo.
 
 ---
 
 ## Historial de cambios
+
+### 2026-10-20 — La nota del socio se ve en la pantalla del DNI
+rama `claude/youthful-mendel-ngjxmr` (rehecha desde `main` después de los PRs #9 y #10)
+- **Pedido del cliente:** si a un socio se le anota "debe $500", que lo vea él mismo al poner
+  su DNI en la pantalla de la puerta.
+- La nota sale en un recuadro naranja debajo del vencimiento, tanto con **acceso OK** como con
+  **cuota vencida** (con DNI no registrado no hay socio, no sale nada). La puerta abre igual: la
+  nota es solo un aviso. Si hay nota, el cartel queda **9 s** en vez de 5,5 s para que se lea.
+- En la ventanita de Notas hay una casilla **"👁 Que el socio la vea al poner su DNI"**
+  (marcada por defecto). Destildada = nota interna, solo la ve el gym.
+- En las tablas de Socios y Pagos la nota sale con 👁 (la ve el socio) o 🔒 (interna).
+- Pantallas bajas (menos de 900 px de alto, ej. 1366×768): los carteles se achican para que
+  entre la nota sin cortarse.
+- El botón "simular cuota vencida" (sección Puerta) ahora trae una nota de ejemplo "Debe $500".
+- **Archivos:** `db/database.py` (columna `nota_visible` + `set_observaciones(..., visible)`),
+  `ui/ventana_acceso.py`, `ui/panel_admin.py`.
+- **Probado** (Xvfb, 1920×1080 y 1366×768): base vieja sin la columna → se agrega sola y la nota
+  que ya estaba sale visible; nota con OK, nota de 2 líneas con vencida, nota 🔒 no aparece; al volver
+  a "Ingresá tu DNI" la nota desaparece. **No probado:** Windows ni el monitor real del gym.
+- **Ojo:** todas las notas cargadas hasta hoy quedan visibles para el socio. Si alguna es
+  interna, destildarle la casilla. Hay que rearmar el `.exe`.
 
 ### 2026-10-12 — Logo oficial fijo en la pantalla del DNI
 rama `claude/youthful-mendel-ngjxmr`

@@ -468,15 +468,18 @@ class PanelAdmin(tk.Frame):
                 s["celular"] or "-", s["plan_nombre"] or "-",
                 "✅ Al día" if vigente else "❌ Vencida",
                 vence, s.get("fecha_alta", "-") or "-",
-                self._nota_corta(s.get("observaciones"))
+                self._nota_corta(s)
             ), tags=("con_nota",) if s.get("observaciones") else ())
 
     @staticmethod
-    def _nota_corta(nota):
-        """Nota en una sola línea para la tabla (vacía si no hay)."""
+    def _nota_corta(socio):
+        """Nota en una sola línea para la tabla (vacía si no hay).
+        👁 = la ve el socio en la pantalla del DNI · 🔒 = solo la ve el gym."""
+        nota = socio.get("observaciones")
         if not nota:
             return ""
-        return "📝 " + " / ".join(l.strip() for l in nota.splitlines() if l.strip())
+        icono = "👁" if socio.get("nota_visible", 1) else "🔒"
+        return f"{icono} " + " / ".join(l.strip() for l in nota.splitlines() if l.strip())
 
     def _on_doble_click_socio(self, event):
         fila = self.tree_socios.identify_row(event.y)
@@ -512,6 +515,7 @@ class PanelAdmin(tk.Frame):
                  font=FONT_BOLD, fg=T("ACENTO"), bg=T("BG")).pack(anchor="w", padx=16, pady=(14, 2))
         tk.Label(win, text='Anotaciones cortas, ej: "Debe $2500", "Se le deben $5000"',
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(anchor="w", padx=16)
+        var_visible = tk.BooleanVar(value=bool(socio.get("nota_visible", 1)))
 
         txt = tk.Text(win, width=44, height=4, wrap="word",
                       bg=T("ENTRADA_BG"), fg=T("TEXT"), insertbackground=T("TEXT"),
@@ -521,9 +525,14 @@ class PanelAdmin(tk.Frame):
         txt.pack(padx=16, pady=8)
         txt.insert("1.0", socio.get("observaciones") or "")
         txt.focus_set()
+        tk.Checkbutton(win, text="👁  Que el socio la vea al poner su DNI (pantalla de la puerta)",
+                       variable=var_visible,
+                       bg=T("BG"), fg=T("TEXT"), selectcolor=T("ENTRADA_BG"),
+                       activebackground=T("BG"), activeforeground=T("TEXT"),
+                       font=FONT_SMALL).pack(anchor="w", padx=12, pady=(0, 8))
 
         def guardar(event=None):
-            db.set_observaciones(socio_id, txt.get("1.0", "end"))
+            db.set_observaciones(socio_id, txt.get("1.0", "end"), var_visible.get())
             win.destroy()
             self._refrescar_listas()
             return "break"
@@ -805,7 +814,7 @@ class PanelAdmin(tk.Frame):
                 ultimo["fecha_pago"]        if ultimo else "—",
                 ultimo["fecha_vencimiento"] if ultimo else "—",
                 "✅ Al día" if vigente else "❌ Vencida",
-                self._nota_corta(s.get("observaciones"))
+                self._nota_corta(s)
             ), tags=("con_nota",) if s.get("observaciones") else ())
 
     def _registrar_pago_seleccionado(self):
@@ -827,7 +836,7 @@ class PanelAdmin(tk.Frame):
         tk.Label(win, text=f"DNI: {socio['dni']}  |  Plan: {socio['plan_nombre'] or '-'}",
                  fg=T("TEXT_DIM"), bg=T("BG"), font=FONT_SMALL).pack(pady=(0, 10))
         if socio.get("observaciones"):
-            tk.Label(win, text=f"📝 {socio['observaciones']}", fg=WARN, bg=T("BG"),
+            tk.Label(win, text=self._nota_corta(socio), fg=WARN, bg=T("BG"),
                      font=FONT_BOLD, wraplength=420, justify="left").pack(padx=20, pady=(0, 8))
 
         f1 = tk.Frame(win, bg=T("BG"))
@@ -1190,6 +1199,7 @@ class PanelAdmin(tk.Frame):
             ventana._estado_ok(socio_demo)
         elif tipo == "vencida":
             socio_demo["vencimiento"] = (date.today() - timedelta(days=3)).strftime("%Y-%m-%d")
+            socio_demo["observaciones"] = "Debe $500"  # para ver cómo sale la nota
             ventana._estado_vencida(socio_demo)
         else:
             ventana._estado_no_encontrado()

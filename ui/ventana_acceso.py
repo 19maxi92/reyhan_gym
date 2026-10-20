@@ -37,6 +37,8 @@ COLOR_INPUT_BG    = "#1a1a1a"
 COLOR_INPUT_BORDE = "#333333"
 
 TIEMPO_MENSAJE = 5500  # ms que se muestra el cartel antes de volver al estado inicial
+TIEMPO_CON_NOTA = 9000 # si el socio tiene una nota para leer, el cartel queda más tiempo
+COLOR_NOTA_BG  = "#2a1c0e"
 DIAS_AVISO     = 5     # con esta cantidad de días o menos, el vencimiento sale en naranja
 
 
@@ -90,6 +92,8 @@ class VentanaAcceso(tk.Toplevel):
     # ─── UI ───────────────────────────────────────────────────────────────────
 
     def _build_ui(self, w, h):
+        # En pantallas bajas (ej. 1366x768) se achican los carteles para que entre la nota
+        chica = h < 900
         # Fondo principal
         self.canvas = tk.Canvas(self, bg=COLOR_FONDO, highlightthickness=0)
         self.canvas.place(x=0, y=0, width=w, height=h)
@@ -154,18 +158,19 @@ class VentanaAcceso(tk.Toplevel):
 
         # Área de mensaje (ok / error) — posición relativa más arriba
         self.frame_msg = tk.Frame(self, bg=COLOR_FONDO)
-        self.frame_msg.place(relx=0.5, rely=0.74, anchor="center",
-                             width=800, height=290)
+        # Arranca debajo del campo DNI y usa el resto de la pantalla
+        self.frame_msg.place(relx=0.5, rely=0.56, anchor="n",
+                             width=900, relheight=0.43)
 
         self.lbl_icono = tk.Label(
-            self.frame_msg, text="", font=("Segoe UI Emoji", 52),
+            self.frame_msg, text="", font=("Segoe UI Emoji", 38 if chica else 52),
             bg=COLOR_FONDO
         )
         self.lbl_icono.pack()
 
         self.lbl_msg = tk.Label(
             self.frame_msg, text="",
-            font=("Georgia", 24, "bold"),
+            font=("Georgia", 20 if chica else 24, "bold"),
             bg=COLOR_FONDO, wraplength=650, justify="center"
         )
         self.lbl_msg.pack()
@@ -180,10 +185,19 @@ class VentanaAcceso(tk.Toplevel):
         # Fecha de vencimiento de la cuota (para que el socio sepa cuándo pagar)
         self.lbl_vence = tk.Label(
             self.frame_msg, text="",
-            font=("Georgia", 22, "bold"),
+            font=("Georgia", 18 if chica else 22, "bold"),
             bg=COLOR_FONDO, wraplength=780, justify="center"
         )
         self.lbl_vence.pack(pady=(12, 0))
+
+        # Nota del socio que se carga en el panel (ej: "Debe $500").
+        # Se muestra solo si tiene nota y está marcada para que la vea.
+        self.lbl_nota = tk.Label(
+            self.frame_msg, text="",
+            font=("Georgia", 18 if chica else 22, "bold"),
+            fg=COLOR_ACENTO, bg=COLOR_NOTA_BG,
+            wraplength=820, justify="center", padx=24, pady=10
+        )
 
     # ─── ESTADOS ──────────────────────────────────────────────────────────────
 
@@ -196,6 +210,7 @@ class VentanaAcceso(tk.Toplevel):
         self.lbl_msg.config(text="", fg=COLOR_FONDO)
         self.lbl_submsg.config(text="", fg=COLOR_FONDO)
         self.lbl_vence.config(text="", fg=COLOR_FONDO)
+        self.lbl_nota.pack_forget()
         self.entry_dni.config(
             fg=COLOR_ACENTO,
             highlightbackground=COLOR_INPUT_BORDE
@@ -210,9 +225,10 @@ class VentanaAcceso(tk.Toplevel):
         self.lbl_msg.config(text=nombre, fg=COLOR_OK)
         self.lbl_submsg.config(text="Acceso habilitado", fg="#aaaaaa")
         self._mostrar_vencimiento(socio, vigente=True)
+        hay_nota = self._mostrar_nota(socio)
         self.entry_dni.config(fg=COLOR_OK, highlightbackground=COLOR_OK)
         threading.Thread(target=puerta.abrir, daemon=True).start()
-        self._volver_en(TIEMPO_MENSAJE)
+        self._volver_en(TIEMPO_CON_NOTA if hay_nota else TIEMPO_MENSAJE)
 
     def _estado_vencida(self, socio):
         self.var_dni.set("")
@@ -225,8 +241,9 @@ class VentanaAcceso(tk.Toplevel):
             fg="#aaaaaa"
         )
         self._mostrar_vencimiento(socio, vigente=False)
+        hay_nota = self._mostrar_nota(socio)
         self.entry_dni.config(fg=COLOR_ERROR, highlightbackground=COLOR_ERROR)
-        self._volver_en(TIEMPO_MENSAJE)
+        self._volver_en(TIEMPO_CON_NOTA if hay_nota else TIEMPO_MENSAJE)
 
     def _estado_no_encontrado(self):
         self.var_dni.set("")
@@ -238,12 +255,23 @@ class VentanaAcceso(tk.Toplevel):
             fg="#aaaaaa"
         )
         self.lbl_vence.config(text="", fg=COLOR_FONDO)
+        self.lbl_nota.pack_forget()
         self.entry_dni.config(fg=COLOR_WARN, highlightbackground=COLOR_WARN)
         self._volver_en(TIEMPO_MENSAJE)
 
     def _mostrar_vencimiento(self, socio, vigente):
         texto, color = texto_vencimiento(socio.get("vencimiento"), vigente)
         self.lbl_vence.config(text=texto, fg=color or COLOR_FONDO)
+
+    def _mostrar_nota(self, socio):
+        """Muestra la nota del socio si tiene y es visible. Devuelve True si mostró algo."""
+        nota = (socio.get("observaciones") or "").strip()
+        if not nota or not socio.get("nota_visible", 1):
+            self.lbl_nota.pack_forget()
+            return False
+        self.lbl_nota.config(text=f"📝  {nota}")
+        self.lbl_nota.pack(pady=(18, 0))
+        return True
 
     # ─── INPUT ────────────────────────────────────────────────────────────────
 

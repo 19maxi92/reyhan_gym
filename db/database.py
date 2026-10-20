@@ -63,6 +63,13 @@ def init_db():
         )
     """)
 
+    # Columnas agregadas después (las bases viejas no se recrean)
+    try:
+        # 1 = la nota del socio se muestra en la pantalla del DNI
+        c.execute("ALTER TABLE socios ADD COLUMN nota_visible INTEGER DEFAULT 1")
+    except sqlite3.OperationalError:
+        pass  # ya existe
+
     # Planes por defecto si no hay ninguno
     c.execute("SELECT COUNT(*) FROM planes")
     if c.fetchone()[0] == 0:
@@ -152,11 +159,15 @@ def editar_socio(socio_id, nombre, apellido, celular, plan_id,
     conn.close()
 
 
-def set_observaciones(socio_id, texto):
-    """Guarda la nota rápida del socio (ej: "Debe $2500"). Texto vacío = sin nota."""
+def set_observaciones(socio_id, texto, visible=True):
+    """
+    Guarda la nota rápida del socio (ej: "Debe $2500"). Texto vacío = sin nota.
+    visible=True → el socio la ve en la pantalla del DNI.
+    """
     texto = (texto or "").strip() or None
     conn = get_conn()
-    conn.execute("UPDATE socios SET observaciones=? WHERE id=?", (texto, socio_id))
+    conn.execute("UPDATE socios SET observaciones=?, nota_visible=? WHERE id=?",
+                 (texto, 1 if visible else 0, socio_id))
     conn.commit()
     conn.close()
 
